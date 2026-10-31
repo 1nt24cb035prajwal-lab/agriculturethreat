@@ -119,39 +119,43 @@
             </div>
 
             <form id="loginForm" class="auth-form active">
-              <label>Mobile Number<input type="text" name="mobile" value="+91 98765 43210" /></label>
-              <label>Password<input type="password" name="password" value="demo123" /></label>
+              <label>Phone Number or Email<input type="text" name="identifier" autocomplete="username" required /></label>
+              <label>Password<input type="password" name="password" autocomplete="current-password" required /></label>
               <button class="primary-btn full" type="submit">Login</button>
               <a href="#" class="link-text" id="forgotPassword">Forgot Password?</a>
             </form>
 
             <form id="registerForm" class="auth-form">
               <div class="two-col">
-                <label>Full Name<input type="text" name="fullName" placeholder="Farmer name" /></label>
-                <label>Mobile<input type="text" name="mobile" placeholder="+91 ..." /></label>
+                <label>Full Name<input type="text" name="fullName" autocomplete="name" required /></label>
+                <label>Mobile<input type="tel" name="mobile" autocomplete="tel" required /></label>
               </div>
               <div class="two-col">
-                <label>Email<input type="email" name="email" placeholder="name@example.com" /></label>
-                <label>Password<input type="password" name="password" placeholder="Password" /></label>
+                <label>Email<input type="email" name="email" autocomplete="email" required /></label>
+                <label>Password<input type="password" name="password" autocomplete="new-password" minlength="10" required /></label>
+              </div>
+              <label>Confirm Password<input type="password" name="confirmPassword" autocomplete="new-password" minlength="10" required /></label>
+              <div class="two-col">
+                <label>State<input type="text" name="state" required /></label>
+                <label>District<input type="text" name="district" required /></label>
               </div>
               <div class="two-col">
-                <label>State<input type="text" name="state" placeholder="State" /></label>
-                <label>District<input type="text" name="district" placeholder="District" /></label>
+                <label>Village<input type="text" name="village" /></label>
+                <label>Farm Name<input type="text" name="farmName" required /></label>
               </div>
-              <div class="two-col">
-                <label>Village<input type="text" name="village" placeholder="Village" /></label>
-                <label>Farm Name<input type="text" name="farmName" placeholder="Farm Name" /></label>
-              </div>
+              <label class="terms-check"><input type="checkbox" name="termsAccepted" required /> I accept the Terms and Conditions</label>
               <button class="primary-btn full" type="submit">Register Farmer</button>
             </form>
           </div>
         </section>
 
         <section class="dashboard-section hidden" id="dashboardSection">
+          <div class="data-notice" role="status">Prototype mode: dashboard weather, vegetation, and risk cards are sample data, not live measurements. SMS OTP, Google login, satellite feeds, and market prices are not configured.</div>
           <div class="dashboard-header">
             <div>
               <p class="eyebrow">Farmer dashboard</p>
               <h2 id="welcomeMessage">Welcome</h2>
+              <p id="farmerProfileSummary" class="profile-summary"></p>
             </div>
             <button class="secondary-btn" id="logoutButton">Logout</button>
           </div>
@@ -189,20 +193,20 @@
             <div class="panel-title">Farm Location & Crop Recommendation</div>
             <form id="cropRecommendationForm" class="recommendation-form">
               <div class="two-col">
-                <label>Farmer Name<input type="text" name="fullName" value="Ananya Gowda" required /></label>
-                <label>Current Crop<input type="text" name="cropName" value="Rice" placeholder="Rice, Wheat, Maize..." required /></label>
+                <label>Farm Name<input type="text" name="farmName" required /></label>
+                <label>Current Crop<input type="text" name="cropName" placeholder="Rice, Wheat, Maize..." required /></label>
               </div>
               <div class="two-col">
-                <label>State<input type="text" name="state" value="Karnataka" required /></label>
-                <label>District<input type="text" name="district" value="Mysuru" required /></label>
+                <label>State<input type="text" name="state" required /></label>
+                <label>District<input type="text" name="district" required /></label>
               </div>
               <div class="two-col">
-                <label>Village<input type="text" name="village" value="Hunsur" /></label>
+                <label>Village<input type="text" name="village" /></label>
                 <label>Soil Type<select name="soilType"><option>Black Soil</option><option>Clay Loam</option><option>Red Soil</option><option>Loam</option><option>Sandy Loam</option><option>Alluvial</option></select></label>
               </div>
               <div class="two-col">
                 <label>Season<select name="season"><option>Kharif</option><option>Rabi</option><option>Summer</option></select></label>
-                <label>Land Area (acres)<input type="number" min="0.1" step="0.1" name="landArea" value="12.5" /></label>
+                <label>Land Area (acres)<input type="number" min="0.1" step="0.1" name="landArea" value="1" required /></label>
               </div>
               <div class="two-col">
                 <label>Seasonal Rainfall (mm)<input type="number" min="0" step="1" name="rainfall" value="750" /></label>
@@ -210,15 +214,16 @@
               </div>
               <label>Average Humidity (%)<input type="number" min="0" max="100" step="1" name="humidity" value="68" /></label>
               <div class="two-col">
-                <label>Latitude<input type="number" min="-90" max="90" step="any" name="latitude" value="12.3" required /></label>
-                <label>Longitude<input type="number" min="-180" max="180" step="any" name="longitude" value="76.6" required /></label>
+                <label>Latitude<input type="number" min="-90" max="90" step="any" name="latitude" required /></label>
+                <label>Longitude<input type="number" min="-180" max="180" step="any" name="longitude" required /></label>
               </div>
               <div class="map-toolbar">
                 <span>Farm coordinates</span>
                 <button class="secondary-btn" id="locateFarmButton" type="button">Use my location</button>
               </div>
               <div id="farmMap" aria-label="Farm location map"></div>
-              <p id="mapStatus" class="map-status">Choose a point on the map or enter coordinates above.</p>
+              <p id="mapStatus" class="map-status">No farm location saved. Click the map, move the pin, or allow device location to set coordinates.</p>
+              <button class="secondary-btn" id="saveFarmButton" type="button">Save Farm Details</button>
               <button class="primary-btn" type="submit">Generate Recommendation</button>
             </form>
             <div id="recommendationResult" class="disease-result">Add your farm location and crop to generate a location-aware recommendation.</div>
@@ -228,10 +233,17 @@
             <div class="panel-title">Crop Disease Camera Detection</div>
             <form id="diseaseForm" class="disease-form">
               <input type="file" id="diseaseImage" name="file" accept="image/*" capture="environment" />
+              <img id="diseasePreview" class="disease-preview hidden" alt="Preview of selected crop image" />
+              <button class="secondary-btn hidden" id="removeDiseaseImage" type="button">Remove image</button>
               <p class="map-status">Image analysis will use the crop and farm location above.</p>
               <button class="primary-btn" type="submit">Detect Disease</button>
             </form>
             <div id="diseaseResult" class="disease-result">Upload a crop photo to run AI disease detection.</div>
+            <a class="secondary-btn supplier-link" href="https://share.google/tCbEJZtVxZKIURC8C" target="_blank" rel="noopener noreferrer">Find Fertilizer Suppliers</a>
+          </div>
+          <div class="panel wide-panel">
+            <div class="panel-title">Activity History</div>
+            <div id="activityHistory" class="list-stack"><p>No saved activity yet.</p></div>
           </div>
         </section>
 

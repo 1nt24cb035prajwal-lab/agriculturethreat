@@ -5,6 +5,7 @@ const dashboardSection = document.getElementById('dashboardSection');
 const adminSection = document.getElementById('adminSection');
 const authBox = document.getElementById('authBox');
 const welcomeMessage = document.getElementById('welcomeMessage');
+const farmerProfileSummary = document.getElementById('farmerProfileSummary');
 const dashboardCards = document.getElementById('dashboardCards');
 const weatherForecast = document.getElementById('weatherForecast');
 const vegetationMap = document.getElementById('vegetationMap');
@@ -17,6 +18,7 @@ const diseaseImageInput = document.getElementById('diseaseImage');
 const diseaseResult = document.getElementById('diseaseResult');
 const cropRecommendationForm = document.getElementById('cropRecommendationForm');
 const recommendationResult = document.getElementById('recommendationResult');
+const activityHistory = document.getElementById('activityHistory');
 const farmMapElement = document.getElementById('farmMap');
 const mapStatus = document.getElementById('mapStatus');
 const latitudeInput = cropRecommendationForm.querySelector('[name="latitude"]');
@@ -35,6 +37,18 @@ const api = {
   post: async (path, body) => {
     const response = await fetch(path, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Request failed');
+    }
+    return response.json();
+  },
+  put: async (path, body) => {
+    const response = await fetch(path, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
@@ -144,7 +158,7 @@ const renderAdminStats = (adminData) => {
 
 const showDashboard = async () => {
   try {
-    const [dashboard, weather, vegetation, threats, fertilizer, yieldData, water, admin] = await Promise.all([
+    const [dashboard, weather, vegetation, threats, fertilizer, yieldData, water, profile, history] = await Promise.all([
       api.get('/api/dashboard'),
       api.get('/api/weather'),
       api.get('/api/vegetation'),
@@ -152,13 +166,17 @@ const showDashboard = async () => {
       api.get('/api/fertilizer'),
       api.get('/api/yield'),
       api.get('/api/water'),
-      api.get('/api/admin')
+      api.get('/api/me'),
+      api.get('/api/activity')
     ]);
 
     renderDashboard(dashboard, weather, vegetation, threats, fertilizer, yieldData, water);
-    renderAdminStats(admin);
+    welcomeMessage.textContent = `Welcome, ${profile.farmer.name}`;
+    farmerProfileSummary.textContent = `${profile.farmer.email} · ${profile.farm?.farmName || 'Farm details not yet saved'}`;
+    fillFarmForm(profile.farm || {});
+    renderActivity(history.items);
     dashboardSection.classList.remove('hidden');
-    adminSection.classList.remove('hidden');
+    adminSection.classList.add('hidden');
     authBox.classList.add('hidden');
     window.setTimeout(() => farmMap?.invalidateSize(), 60);
   } catch (error) {
@@ -170,7 +188,7 @@ const login = async (event) => {
   event.preventDefault();
   const formData = new FormData(loginForm);
   const payload = {
-    mobile: formData.get('mobile'),
+    identifier: formData.get('identifier'),
     password: formData.get('password')
   };
 
@@ -185,6 +203,10 @@ const login = async (event) => {
 const register = async (event) => {
   event.preventDefault();
   const formData = new FormData(registerForm);
+  if (formData.get('password') !== formData.get('confirmPassword')) {
+    alert('Passwords do not match.');
+    return;
+  }
   const payload = {
     fullName: formData.get('fullName'),
     mobile: formData.get('mobile'),
@@ -193,12 +215,14 @@ const register = async (event) => {
     state: formData.get('state'),
     district: formData.get('district'),
     village: formData.get('village'),
-    farmName: formData.get('farmName')
+    farmName: formData.get('farmName'),
+    termsAccepted: formData.get('termsAccepted') === 'on'
   };
 
   try {
-    await api.post('/api/auth/register', payload);
-    alert('Registration successful. You are now in demo mode.');
+    const result = await api.post('/api/auth/register', payload);
+    document.querySelector('#loginForm [name="identifier"]').value = payload.mobile;
+    alert(`${result.message} Sign in with your phone or email and password.`);
     showTab('login');
   } catch (error) {
     alert(error.message || 'Unable to register');
@@ -207,9 +231,9 @@ const register = async (event) => {
 
 const resetPassword = async (event) => {
   event.preventDefault();
-  const mobile = document.querySelector('#loginForm input[name="mobile"]').value;
+  const identifier = document.querySelector('#loginForm input[name="identifier"]').value;
   try {
-    const result = await api.post('/api/auth/forgot-password', { mobile });
+    const result = await api.post('/api/auth/forgot-password', { identifier });
     alert(result.message);
   } catch (error) {
     alert(error.message || 'Unable to reset password');
@@ -217,10 +241,65 @@ const resetPassword = async (event) => {
 };
 
 const logout = () => {
+  api.post('/api/auth/logout', {}).catch(() => {});
   dashboardSection.classList.add('hidden');
   adminSection.classList.add('hidden');
   authBox.classList.remove('hidden');
   showTab('login');
+};
+
+const fillFarmForm = (farm) => {
+  const form = cropRecommendationForm;
+  for (const [name, value] of Object.entries(farm)) {
+    const input = form.elements.namedItem(name);
+    if (input && value !== null && value !== undefined && value !== '') {
+      input.value = value;
+    }
+  }
+  if (farm.latitude !== null && farm.latitude !== undefined && farm.longitude !== null && farm.longitude !== undefined) {
+    setFarmCoordinates(Number(farm.latitude), Number(farm.longitude), 'Saved farm location');
+  }
+};
+
+const renderActivity = (items) => {
+  if (!items.length) {
+    activityHistory.innerHTML = '<p>No saved activity yet.</p>';
+    return;
+  }
+  activityHistory.innerHTML = items.map((item) => `
+    <div class="list-item">
+      <strong>${escapeHtml(item.type.replaceAll('_', ' '))}</strong>
+      <p>${escapeHtml(JSON.stringify(item.details))}</p>
+      <small>${new Date(item.createdAt * 1000).toLocaleString()}</small>
+    </div>
+  `).join('');
+};
+
+const farmerFormPayload = () => {
+  const data = new FormData(cropRecommendationForm);
+  return {
+    farmName: data.get('farmName'),
+    cropName: data.get('cropName'),
+    state: data.get('state'),
+    district: data.get('district'),
+    village: data.get('village'),
+    soilType: data.get('soilType'),
+    season: data.get('season'),
+    landArea: Number(data.get('landArea')),
+    rainfall: Number(data.get('rainfall')),
+    humidity: Number(data.get('humidity')),
+    temperature: Number(data.get('temperature')),
+    latitude: Number(data.get('latitude')),
+    longitude: Number(data.get('longitude'))
+  };
+};
+
+const saveFarmProfile = async () => {
+  const result = await api.put('/api/farm/profile', farmerFormPayload());
+  farmerProfileSummary.textContent = `${result.farm.farmName} · ${result.farm.village}, ${result.farm.district}, ${result.farm.state}`;
+  const history = await api.get('/api/activity');
+  renderActivity(history.items);
+  return result;
 };
 
 const analyzeDisease = async (event) => {
@@ -273,26 +352,12 @@ const analyzeDisease = async (event) => {
 
 const generateRecommendation = async (event) => {
   event.preventDefault();
-  const formData = new FormData(cropRecommendationForm);
-  const payload = {
-    fullName: formData.get('fullName') || 'Farm owner',
-    cropName: formData.get('cropName'),
-    state: formData.get('state') || 'Karnataka',
-    district: formData.get('district') || 'Mysuru',
-    village: formData.get('village') || 'Hunsur',
-    season: formData.get('season') || 'Kharif',
-    soilType: formData.get('soilType') || 'Loam',
-    landArea: Number(formData.get('landArea') || 1),
-    latitude: Number(formData.get('latitude') || 12.3),
-    longitude: Number(formData.get('longitude') || 76.6),
-    rainfall: Number(formData.get('rainfall') || 750),
-    humidity: Number(formData.get('humidity') || 68),
-    temperature: Number(formData.get('temperature') || 28)
-  };
+  const payload = farmerFormPayload();
 
   recommendationResult.textContent = 'Generating the crop recommendation model output...';
 
   try {
+    await api.put('/api/farm/profile', payload);
     const response = await fetch('/api/farm/recommendation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -326,6 +391,7 @@ const generateRecommendation = async (event) => {
       <div><strong>Confidence:</strong> ${confidencePct}%</div>
       <div><strong>Guidance:</strong> ${escapeHtml(irrigationAdvice)}</div>
     `;
+    renderActivity((await api.get('/api/activity')).items);
   } catch (error) {
     recommendationResult.textContent = error.message || 'Unable to generate crop recommendation.';
   }
@@ -338,6 +404,14 @@ const setFarmCoordinates = (latitude, longitude, source) => {
     const position = [latitude, longitude];
     farmMarker.setLatLng(position);
     farmMap.setView(position, Math.max(farmMap.getZoom(), 11));
+  } else if (farmMap) {
+    const position = [latitude, longitude];
+    farmMarker = window.L.marker(position, { draggable: true }).addTo(farmMap);
+    farmMarker.on('dragend', (event) => {
+      const movedTo = event.target.getLatLng();
+      setFarmCoordinates(movedTo.lat, movedTo.lng, 'Moved pin');
+    });
+    farmMap.setView(position, 11);
   }
   mapStatus.textContent = `${source}: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 };
@@ -348,27 +422,41 @@ const initializeFarmMap = () => {
     return;
   }
 
-  const initialPosition = [Number(latitudeInput.value) || 12.3, Number(longitudeInput.value) || 76.6];
-  farmMap = window.L.map(farmMapElement).setView(initialPosition, 10);
+  const hasSavedLocation = latitudeInput.value !== '' && longitudeInput.value !== '';
+  const initialPosition = hasSavedLocation
+    ? [Number(latitudeInput.value), Number(longitudeInput.value)]
+    : [20.5937, 78.9629];
+  farmMap = window.L.map(farmMapElement).setView(initialPosition, hasSavedLocation ? 10 : 4);
   window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(farmMap);
-  farmMarker = window.L.marker(initialPosition, { draggable: true }).addTo(farmMap);
+  if (hasSavedLocation) {
+    farmMarker = window.L.marker(initialPosition, { draggable: true }).addTo(farmMap);
+    farmMarker.on('dragend', (event) => {
+      const position = event.target.getLatLng();
+      setFarmCoordinates(position.lat, position.lng, 'Moved pin');
+    });
+  }
   farmMap.on('click', (event) => setFarmCoordinates(event.latlng.lat, event.latlng.lng, 'Map pin'));
-  farmMarker.on('dragend', (event) => {
-    const position = event.target.getLatLng();
-    setFarmCoordinates(position.lat, position.lng, 'Moved pin');
-  });
   farmMapElement.dataset.ready = 'true';
 };
 
-latitudeInput.addEventListener('change', () => {
-  setFarmCoordinates(Number(latitudeInput.value), Number(longitudeInput.value), 'Coordinates');
-});
-longitudeInput.addEventListener('change', () => {
-  setFarmCoordinates(Number(latitudeInput.value), Number(longitudeInput.value), 'Coordinates');
-});
+const syncFarmCoordinatesFromInputs = () => {
+  if (!latitudeInput.value.trim() || !longitudeInput.value.trim()) {
+    return;
+  }
+  const latitude = Number(latitudeInput.value);
+  const longitude = Number(longitudeInput.value);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+    mapStatus.textContent = 'Enter a valid latitude and longitude.';
+    return;
+  }
+  setFarmCoordinates(latitude, longitude, 'Coordinates');
+};
+
+latitudeInput.addEventListener('change', syncFarmCoordinatesFromInputs);
+longitudeInput.addEventListener('change', syncFarmCoordinatesFromInputs);
 document.getElementById('locateFarmButton').addEventListener('click', () => {
   if (!navigator.geolocation) {
     mapStatus.textContent = 'Location services are not available in this browser.';
@@ -380,6 +468,14 @@ document.getElementById('locateFarmButton').addEventListener('click', () => {
     () => { mapStatus.textContent = 'Location permission was not granted. Choose a map point or enter coordinates.'; },
     { enableHighAccuracy: true, timeout: 10000 }
   );
+});
+document.getElementById('saveFarmButton').addEventListener('click', async () => {
+  try {
+    const result = await saveFarmProfile();
+    recommendationResult.textContent = `Saved farm profile for ${result.farm.farmName}.`;
+  } catch (error) {
+    recommendationResult.textContent = error.message || 'Unable to save farm profile.';
+  }
 });
 
 const primaryAction = document.getElementById('startButton');
@@ -397,6 +493,26 @@ logoutButton.addEventListener('click', logout);
 diseaseForm.addEventListener('submit', analyzeDisease);
 cropRecommendationForm.addEventListener('submit', generateRecommendation);
 initializeFarmMap();
+
+diseaseImageInput.addEventListener('change', () => {
+  const image = diseaseImageInput.files[0];
+  const preview = document.getElementById('diseasePreview');
+  const removeButton = document.getElementById('removeDiseaseImage');
+  if (!image) {
+    preview.classList.add('hidden');
+    removeButton.classList.add('hidden');
+    preview.removeAttribute('src');
+    return;
+  }
+  preview.src = URL.createObjectURL(image);
+  preview.classList.remove('hidden');
+  removeButton.classList.remove('hidden');
+});
+
+document.getElementById('removeDiseaseImage').addEventListener('click', () => {
+  diseaseImageInput.value = '';
+  diseaseImageInput.dispatchEvent(new Event('change'));
+});
 
 [primaryAction, primarySecondary, loginButton, ctaSecondary].forEach((button) => {
   button.addEventListener('click', () => {

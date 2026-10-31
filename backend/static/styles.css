@@ -427,6 +427,18 @@ input {
   width: 100%;
 }
 
+.terms-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.terms-check input {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
 .link-text {
   color: var(--green);
   text-align: center;
@@ -632,6 +644,35 @@ input {
   border: 1px solid rgba(21, 63, 45, 0.08);
   color: #345947;
   line-height: 1.7;
+}
+
+.data-notice {
+  margin: 12px 0 20px;
+  padding: 12px 14px;
+  border-left: 4px solid #d99021;
+  background: #fff8e9;
+  color: #594318;
+  line-height: 1.55;
+}
+
+.profile-summary,
+.map-status {
+  color: #4c685d;
+}
+
+.disease-preview {
+  display: block;
+  max-width: min(100%, 480px);
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #eef4ee;
+}
+
+.supplier-link {
+  display: inline-flex;
+  margin-top: 12px;
+  text-decoration: none;
 }
 
 .wide-panel {

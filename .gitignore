@@ -3,6 +3,8 @@ __pycache__/
 *.pyo
 *.pyd
 .venv/
+backend/*.sqlite3
+backend/uploads/
 .env
 node_modules/
 dist/
