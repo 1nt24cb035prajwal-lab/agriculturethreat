@@ -399,6 +399,7 @@ async def get_reports(farmer: dict = Depends(require_farmer)):
 async def analyze_disease(
     file: UploadFile = File(...),
     cropName: str = Form(None),
+    cropStage: str = Form(None),
     state: str = Form(None),
     district: str = Form(None),
     village: str = Form(None),
@@ -423,7 +424,8 @@ async def analyze_disease(
         image = source_image.convert("RGB")
         result = MODEL_ENGINE.predict(image)
         farm = database.get_farm(farmer["id"])
-        result["cropName"] = cropName or farm.get("cropName") or "General crop"
+        result["cropName"] = cropName or farm.get("cropName") or "Not provided"
+        result["cropStage"] = cropStage or farm.get("cropStage") or "Not provided"
         result["location"] = {
             "state": state or farm.get("state") or "",
             "district": district or farm.get("district") or "",
@@ -443,7 +445,7 @@ async def analyze_disease(
         database.record_activity(
             farmer["id"],
             "disease_detection",
-            {"imageId": image_id, "filename": file.filename, "cropName": result["cropName"], "predictedDisease": result["predictedDisease"], "confidencePct": result["confidencePct"]},
+            {"imageId": image_id, "filename": file.filename, "cropName": result["cropName"], "cropStage": result["cropStage"], "predictedDisease": result["predictedDisease"], "confidencePct": result["confidencePct"]},
         )
         return {
             "message": "Disease analysis completed.",
