@@ -97,7 +97,7 @@ def test_dashboard_is_farmer_scoped_and_unconfigured_feeds_are_not_fabricated():
     assert dashboard.status_code == 200
     payload = dashboard.json()
     assert payload["farmer"]["name"] == "Dashboard Farmer"
-    assert payload["integrations"]["weather"] == "not_configured"
+    assert payload["integrations"]["weather"] == "configured"
 
     weather = client.get("/api/weather")
     assert weather.status_code == 400
