@@ -35,7 +35,8 @@ def initialize_database() -> None:
                 email TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 created_at INTEGER NOT NULL,
-                phone_verified INTEGER NOT NULL DEFAULT 0
+                phone_verified INTEGER NOT NULL DEFAULT 0,
+                google_sub TEXT
             );
             CREATE TABLE IF NOT EXISTS farms (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,11 +66,18 @@ def initialize_database() -> None:
                 image_data BLOB NOT NULL,
                 created_at INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS verified_phones (
+                phone TEXT PRIMARY KEY,
+                verified_until INTEGER NOT NULL
+            );
             """
         )
         farmer_columns = {row["name"] for row in connection.execute("PRAGMA table_info(farmers)")}
         if "phone_verified" not in farmer_columns:
             connection.execute("ALTER TABLE farmers ADD COLUMN phone_verified INTEGER NOT NULL DEFAULT 0")
+        if "google_sub" not in farmer_columns:
+            connection.execute("ALTER TABLE farmers ADD COLUMN google_sub TEXT")
+        connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS farmers_google_sub_idx ON farmers(google_sub) WHERE google_sub IS NOT NULL")
 
 
 def hash_password(password: str) -> str:
@@ -109,6 +117,49 @@ def create_farmer(full_name: str, mobile: str, email: str, password: str, profil
     return farmer_public(row)
 
 
+def create_google_farmer(full_name: str, email: str, google_sub: str) -> dict[str, Any]:
+    """Create a farmer account from a verified Google identity."""
+    now = int(time.time())
+    profile = {
+        "farmName": "",
+        "state": "",
+        "district": "",
+        "village": "",
+        "cropName": "",
+        "latitude": None,
+        "longitude": None,
+    }
+    internal_mobile = f"google:{google_sub}"
+    unusable_password = hash_password(secrets.token_urlsafe(48))
+    with connect() as connection:
+        cursor = connection.execute(
+            "INSERT INTO farmers (full_name, mobile, email, password_hash, created_at, google_sub) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (full_name or "Farmer", internal_mobile, email.lower(), unusable_password, now, google_sub),
+        )
+        farmer_id = cursor.lastrowid
+        connection.execute(
+            "INSERT INTO farms (farmer_id, profile_json, updated_at) VALUES (?, ?, ?)",
+            (farmer_id, json.dumps(profile), now),
+        )
+        connection.execute(
+            "INSERT INTO activity (farmer_id, activity_type, details_json, created_at) VALUES (?, ?, ?, ?)",
+            (farmer_id, "google_account_created", json.dumps({"provider": "google"}), now),
+        )
+        row = connection.execute("SELECT * FROM farmers WHERE id = ?", (farmer_id,)).fetchone()
+    return farmer_public(row)
+
+
+def get_farmer_by_google_sub(google_sub: str) -> sqlite3.Row | None:
+    with connect() as connection:
+        return connection.execute("SELECT * FROM farmers WHERE google_sub = ? LIMIT 1", (google_sub,)).fetchone()
+
+
+def link_google_account(farmer_id: int, google_sub: str) -> None:
+    with connect() as connection:
+        connection.execute("UPDATE farmers SET google_sub = ? WHERE id = ?", (google_sub, farmer_id))
+
+
 def get_farmer_by_login(identifier: str) -> sqlite3.Row | None:
     with connect() as connection:
         return connection.execute(
@@ -121,7 +172,7 @@ def farmer_public(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
     return {
         "id": f"F-{row['id']:06d}" if isinstance(row["id"], int) else str(row["id"]),
         "name": row["full_name"],
-        "mobile": row["mobile"],
+        "mobile": None if str(row["mobile"] or "").startswith("google:") else row["mobile"],
         "email": row["email"],
         "phoneVerified": bool(row["phone_verified"]) if "phone_verified" in row.keys() else False,
     }
@@ -145,7 +196,7 @@ def get_farmer_for_session(token: str | None) -> dict[str, Any] | None:
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     with connect() as connection:
         row = connection.execute(
-            "SELECT f.id, f.full_name, f.mobile, f.email FROM farmer_sessions s "
+            "SELECT f.id, f.full_name, f.mobile, f.email, f.phone_verified FROM farmer_sessions s "
             "JOIN farmers f ON f.id = s.farmer_id WHERE s.token_hash = ? AND s.expires_at > ?",
             (token_hash, int(time.time())),
         ).fetchone()
@@ -222,6 +273,30 @@ def get_disease_image(farmer_id: str, image_id: str) -> dict[str, Any] | None:
     if not row:
         return None
     return {"filename": row["filename"], "mediaType": row["media_type"], "imageData": row["image_data"]}
+
+
+def mark_phone_verified(phone: str, ttl_seconds: int = 900) -> None:
+    with connect() as connection:
+        connection.execute(
+            "INSERT INTO verified_phones (phone, verified_until) VALUES (?, ?) "
+            "ON CONFLICT(phone) DO UPDATE SET verified_until = excluded.verified_until",
+            (phone, int(time.time()) + ttl_seconds),
+        )
+
+
+def consume_phone_verification(phone: str) -> bool:
+    now = int(time.time())
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT verified_until FROM verified_phones WHERE phone = ?", (phone,)
+        ).fetchone()
+        connection.execute("DELETE FROM verified_phones WHERE phone = ?", (phone,))
+    return bool(row and row["verified_until"] >= now)
+
+
+def set_farmer_phone_verified(farmer_id: int) -> None:
+    with connect() as connection:
+        connection.execute("UPDATE farmers SET phone_verified = 1 WHERE id = ?", (farmer_id,))
 
 
 initialize_database()

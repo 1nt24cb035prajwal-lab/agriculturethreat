@@ -48,6 +48,7 @@ def test_crop_recommendation_endpoint_accepts_farmer_inputs():
     assert payload["farmer"]["name"] == "Test Farmer"
     assert payload["recommendation"]["requestedCrop"] == "Rice"
     assert payload["recommendation"]["crop"]
+    assert len(payload["recommendation"]["alternatives"]) <= 3
     assert payload["location"]["coordinates"]["latitude"] == 12.3
     assert client.get("/api/activity").json()["items"][0]["type"] == "crop_recommendation"
 

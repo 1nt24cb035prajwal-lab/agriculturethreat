@@ -1,6 +1,3 @@
-const authTabs = document.querySelectorAll('.tab');
-const loginForm = document.getElementById('loginForm');
-const registerForm = document.getElementById('registerForm');
 const dashboardSection = document.getElementById('dashboardSection');
 const adminSection = document.getElementById('adminSection');
 const authBox = document.getElementById('authBox');
@@ -80,16 +77,6 @@ const toneClassMap = {
   purple: 'purple'
 };
 
-const showTab = (tabName) => {
-  authTabs.forEach((tab) => {
-    const isActive = tab.dataset.tab === tabName;
-    tab.classList.toggle('active', isActive);
-  });
-
-  loginForm.classList.toggle('active', tabName === 'login');
-  registerForm.classList.toggle('active', tabName === 'register');
-};
-
 const renderDashboard = (dashboard, weather = null, water = null) => {
   const { farmer, farm, integrations } = dashboard;
   welcomeMessage.textContent = dashboard.welcome;
@@ -102,8 +89,8 @@ const renderDashboard = (dashboard, weather = null, water = null) => {
     { title: 'Soil type', value: farm.soilType || 'Not set', detail: 'Farmer supplied', tone: 'green' },
     { title: 'Weather', value: weather ? `${weather.current.temperatureC}°C · ${weather.current.condition}` : 'Unavailable', detail: weather ? `${weather.current.humidityPercent}% humidity · ${weather.current.rainfallMm} mm rain` : 'Live weather unavailable', tone: 'amber' },
     { title: 'Water requirement', value: water ? `${water.dailyIrrigationLitersEstimate} L/day est.` : 'Unavailable', detail: water ? `${water.nextSevenDaysLitersEstimate} L / 7-day estimate` : 'Needs crop, area, and live ET0', tone: 'teal' },
-    { title: 'Satellite / NDVI', value: 'Not connected', detail: 'No satellite provider', tone: 'blue' },
-    { title: 'Market prices', value: 'Not connected', detail: 'No market data provider', tone: 'purple' },
+    { title: 'Satellite / NDVI', value: integrations.satellite === 'configured' ? 'Sentinel Hub ready' : 'Needs credentials', detail: 'Sentinel-2 point sample', tone: 'blue' },
+    { title: 'Market prices', value: integrations.marketPrices === 'configured' ? 'Agmarknet API ready' : 'Needs API key', detail: 'data.gov.in mandi arrivals', tone: 'purple' },
     { title: 'Live threat alerts', value: 'Unavailable', detail: 'No verified live threat feed', tone: 'red' }
   ];
   dashboardCards.innerHTML = cards.map((card) => `
@@ -129,7 +116,7 @@ const renderDashboard = (dashboard, weather = null, water = null) => {
   document.getElementById('settingsSummary').innerHTML = `
     <div><strong>Farmer:</strong> ${escapeHtml(farmer.name)}</div>
     <div><strong>Email:</strong> ${escapeHtml(farmer.email)}</div>
-    <div><strong>Phone:</strong> ${escapeHtml(farmer.mobile)} · ${farmer.phoneVerified ? 'Verified' : 'Not verified'}</div>
+    <div><strong>Phone:</strong> ${escapeHtml(farmer.mobile || 'Not provided')} · ${farmer.phoneVerified ? 'Verified' : 'Not provided'}</div>
     <div><strong>Farm:</strong> ${escapeHtml(farm.farmName || 'Not saved')}</div>
     <div><strong>Location:</strong> ${escapeHtml(location)}</div>
   `;
@@ -145,6 +132,37 @@ const renderWeatherForecast = (weather) => {
       </div>
     `).join('') + `<small class="data-source">Source: ${escapeHtml(weather.source)} · Updated ${escapeHtml(weather.retrievedAt)}</small>`
     : '<p class="empty-state">No live forecast is available for this saved farm location.</p>';
+};
+
+const loadYieldEstimate = async () => {
+  const output = document.getElementById('yieldResult');
+  if (!output) return;
+  output.textContent = 'Calculating an indicative yield range...';
+  try {
+    const result = await api.get('/api/yield');
+    output.innerHTML = `<strong>Crop:</strong> ${escapeHtml(result.crop)}<br><strong>Expected estimate:</strong> ${escapeHtml(result.expectedEstimateTonnes)} tonnes<br><strong>Range:</strong> ${escapeHtml(result.lowEstimateTonnes)}–${escapeHtml(result.highEstimateTonnes)} tonnes<br><strong>Area:</strong> ${escapeHtml(result.areaHectares)} ha<br><strong>Confidence:</strong> ${escapeHtml(result.confidence)}<br><small>${escapeHtml(result.notice)}</small>`;
+  } catch (error) { output.textContent = error.message; }
+};
+
+const loadMarketPrices = async () => {
+  const output = document.getElementById('marketResult');
+  if (!output) return;
+  const commodity = document.getElementById('marketCommodity').value.trim();
+  output.textContent = 'Loading mandi arrivals...';
+  try {
+    const result = await api.get('/api/markets' + (commodity ? `?commodity=${encodeURIComponent(commodity)}` : ''));
+    output.innerHTML = result.records.length ? result.records.map(row => `<div class="list-item"><strong>${escapeHtml(row.market || 'Market')}</strong><p>${escapeHtml(row.commodity)} · ${escapeHtml(row.variety || 'Variety not stated')} · ${escapeHtml(row.arrivalDate || '')}</p><p>Min ₹${escapeHtml(row.minPriceRsPerQuintal)} · Modal ₹${escapeHtml(row.modalPriceRsPerQuintal)} · Max ₹${escapeHtml(row.maxPriceRsPerQuintal)} / quintal</p></div>`).join('') + `<small class="data-source">Source: ${escapeHtml(result.source)} · ${escapeHtml(result.retrievedAt)}</small>` : '<p>No matching market records were returned.</p>';
+  } catch (error) { output.textContent = error.message; }
+};
+
+const loadSatelliteNdvi = async () => {
+  const output = vegetationMap;
+  if (!output) return;
+  output.textContent = 'Requesting Sentinel-2 imagery sample...';
+  try {
+    const result = await api.get('/api/vegetation');
+    output.innerHTML = `<strong>NDVI:</strong> ${escapeHtml(result.ndvi)}<p>Source: ${escapeHtml(result.source)} · ${escapeHtml(result.retrievedAt)}</p><small>${escapeHtml(result.notice)}</small>`;
+  } catch (error) { output.textContent = error.message; }
 };
 
 const renderAdminStats = (adminData) => {
@@ -175,6 +193,8 @@ const showDashboard = async () => {
     dashboardData = dashboard;
     renderDashboard(dashboard);
     fillFarmForm(dashboard.farm || {});
+    const marketCommodityInput = document.getElementById('marketCommodity');
+    if (marketCommodityInput && dashboard.farm?.cropName) marketCommodityInput.value = dashboard.farm.cropName;
     renderActivity(history.items);
     dashboardSection.classList.remove('hidden');
     adminSection.classList.add('hidden');
@@ -235,7 +255,6 @@ const renderCurrentPage = async () => {
   if (page === 'home' || page === 'login' || page === 'register') {
     dashboardSection.classList.add('hidden');
     authBox.classList.remove('hidden');
-    showTab(page === 'register' ? 'register' : 'login');
     document.title = page === 'home' ? 'Agriculture Threat Fusion' : `${page === 'login' ? 'Farmer Login' : 'Farmer Registration'} | Agriculture Threat Fusion`;
     return;
   }
@@ -259,63 +278,8 @@ const renderCurrentPage = async () => {
   });
   document.querySelector('[data-feature-view~="settings"]').classList.toggle('hidden', page !== 'settings');
   document.getElementById('downloadReportButton').classList.toggle('hidden', page !== 'reports');
-};
-
-const login = async (event) => {
-  event.preventDefault();
-  const formData = new FormData(loginForm);
-  const payload = {
-    identifier: formData.get('identifier'),
-    password: formData.get('password')
-  };
-
-  try {
-    await api.post('/api/auth/login', payload);
-    navigateTo('/dashboard');
-  } catch (error) {
-    alert(error.message || 'Invalid credentials');
-  }
-};
-
-const register = async (event) => {
-  event.preventDefault();
-  const formData = new FormData(registerForm);
-  if (formData.get('password') !== formData.get('confirmPassword')) {
-    alert('Passwords do not match.');
-    return;
-  }
-  const payload = {
-    fullName: formData.get('fullName'),
-    mobile: formData.get('mobile'),
-    email: formData.get('email'),
-    password: formData.get('password'),
-    state: formData.get('state'),
-    district: formData.get('district'),
-    village: formData.get('village'),
-    farmName: formData.get('farmName'),
-    termsAccepted: formData.get('termsAccepted') === 'on'
-  };
-
-  try {
-    const result = await api.post('/api/auth/register', payload);
-    document.querySelector('#loginForm [name="identifier"]').value = payload.mobile;
-    alert(`${result.message} Sign in with your phone or email and password.`);
-    showTab('login');
-    navigateTo('/login');
-  } catch (error) {
-    alert(error.message || 'Unable to register');
-  }
-};
-
-const resetPassword = async (event) => {
-  event.preventDefault();
-  const identifier = document.querySelector('#loginForm input[name="identifier"]').value;
-  try {
-    const result = await api.post('/api/auth/forgot-password', { identifier });
-    alert(result.message);
-  } catch (error) {
-    alert(error.message || 'Unable to reset password');
-  }
+  if (page === 'yield') { loadYieldEstimate(); loadMarketPrices(); }
+  if (page === 'satellite') loadSatelliteNdvi();
 };
 
 const logout = () => {
@@ -323,7 +287,6 @@ const logout = () => {
   dashboardSection.classList.add('hidden');
   adminSection.classList.add('hidden');
   authBox.classList.remove('hidden');
-  showTab('login');
   navigateTo('/login');
 };
 
@@ -482,7 +445,7 @@ const generateRecommendation = async (event) => {
       throw new Error(result.detail || 'Recommendation failed.');
     }
 
-    const { crop, requestedCrop, suitability, confidencePct, locationZone, reason, irrigationAdvice, fertilizerAdvice, risk, yieldExpectation, datasetNotice } = result.recommendation;
+    const { crop, requestedCrop, suitability, confidencePct, locationZone, reason, irrigationAdvice, fertilizerAdvice, risk, yieldExpectation, datasetNotice, alternatives = [] } = result.recommendation;
     recommendationResult.innerHTML = `
       <strong>Crop entered:</strong> ${escapeHtml(requestedCrop)}<br>
       <strong>Model suggestion:</strong> ${escapeHtml(crop)} (${escapeHtml(suitability)})<br>
@@ -494,6 +457,7 @@ const generateRecommendation = async (event) => {
       <strong>Fertilizer:</strong> ${escapeHtml(fertilizerAdvice)}<br>
       <strong>Risk:</strong> ${escapeHtml(risk)}<br>
       <strong>Yield expectation:</strong> ${escapeHtml(yieldExpectation)}<br>
+      <strong>Other suitable model candidates:</strong> ${alternatives.map(item => `${escapeHtml(item.crop)} (${escapeHtml(item.confidencePct)}%)`).join(', ')}<br>
       <small>${escapeHtml(datasetNotice)}</small>
     `;
 
@@ -539,6 +503,10 @@ const refreshWeatherForCoordinates = async (latitude, longitude) => {
   try {
     const weather = await api.get(`/api/weather/preview?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}`);
     renderWeatherForecast(weather);
+    const liveTemperature = cropRecommendationForm.elements.namedItem('temperature');
+    const liveHumidity = cropRecommendationForm.elements.namedItem('humidity');
+    if (liveTemperature && weather.current.temperatureC != null) liveTemperature.value = weather.current.temperatureC;
+    if (liveHumidity && weather.current.humidityPercent != null) liveHumidity.value = weather.current.humidityPercent;
     const weatherCard = [...dashboardCards.querySelectorAll('.stat-card')].find((card) => card.querySelector('h4')?.textContent === 'Weather');
     if (weatherCard) {
       weatherCard.querySelector('.value').textContent = `${weather.current.temperatureC}°C · ${weather.current.condition}`;
@@ -665,12 +633,12 @@ const primarySecondary = document.getElementById('ctaPrimary');
 const loginButton = document.getElementById('loginButton');
 const ctaSecondary = document.getElementById('ctaSecondary');
 const logoutButton = document.getElementById('logoutButton');
-const forgotPassword = document.getElementById('forgotPassword');
 
-authTabs.forEach((tab) => tab.addEventListener('click', () => navigateTo(tab.dataset.tab === 'register' ? '/register' : '/login')));
-loginForm.addEventListener('submit', login);
-registerForm.addEventListener('submit', register);
-forgotPassword.addEventListener('click', resetPassword);
+document.getElementById('googleLoginButton').addEventListener('click', () => { window.location.href = '/auth/google/start'; });
+document.getElementById('loadYieldButton').addEventListener('click', loadYieldEstimate);
+document.getElementById('loadMarketsButton').addEventListener('click', loadMarketPrices);
+document.getElementById('loadSatelliteButton').addEventListener('click', loadSatelliteNdvi);
+
 logoutButton.addEventListener('click', logout);
 diseaseForm.addEventListener('submit', analyzeDisease);
 cropRecommendationForm.addEventListener('submit', generateRecommendation);

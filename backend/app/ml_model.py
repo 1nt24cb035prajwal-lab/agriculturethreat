@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
@@ -7,6 +8,10 @@ import joblib
 import numpy as np
 from PIL import Image
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 
 
 LABELS = ["Healthy", "Leaf Spot", "Rust", "Blight", "Mosaic"]
@@ -85,6 +90,7 @@ class PlantDiseaseModel:
         self.model_dir.mkdir(exist_ok=True)
         self.model_path = self.model_dir / "plant_disease_model.joblib"
         self.dataset_path = self.model_dir / "plant_disease_dataset.json"
+        self.image_dataset_path = base_dir / "data" / "plant_disease"
         self.model = None
 
     def _build_synthetic_dataset(self):
@@ -130,7 +136,63 @@ class PlantDiseaseModel:
         features = np.concatenate([mean, std, [brightness, contrast, texture]])
         return features.astype(np.float32)
 
+    def train_from_directory(self, dataset_dir: Path | None = None):
+        """Train from an image dataset arranged as class-name subfolders."""
+        source = Path(dataset_dir or self.image_dataset_path)
+        if not source.is_dir():
+            raise FileNotFoundError(
+                f"Disease image dataset not found: {source}. Add class-labelled image folders first."
+            )
+
+        image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+        features, labels = [], []
+        class_counts = {}
+        for class_dir in sorted(path for path in source.iterdir() if path.is_dir()):
+            for image_path in sorted(class_dir.rglob("*")):
+                if image_path.suffix.lower() not in image_extensions:
+                    continue
+                try:
+                    with Image.open(image_path) as image:
+                        features.append(self._extract_features(image))
+                    labels.append(class_dir.name)
+                    class_counts[class_dir.name] = class_counts.get(class_dir.name, 0) + 1
+                except (OSError, ValueError) as exc:
+                    raise ValueError(f"Unable to read disease image: {image_path}") from exc
+
+        if len(features) < 30 or len(class_counts) < 2:
+            raise ValueError("Use at least 30 labelled images across at least two disease classes.")
+        if min(class_counts.values()) < 2:
+            raise ValueError("Each disease class needs at least two images for stratified validation.")
+
+        X = np.vstack(features)
+        y = np.asarray(labels)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=42, stratify=y
+        )
+        classifier = RandomForestClassifier(
+            n_estimators=300,
+            random_state=42,
+            class_weight="balanced",
+            min_samples_leaf=2,
+        )
+        classifier.fit(X_train, y_train)
+        accuracy = float(accuracy_score(y_test, classifier.predict(X_test)))
+        bundle = {
+            "kind": "plant_disease_folders_v1",
+            "classifier": classifier,
+            "dataset_path": source.name,
+            "dataset_images": len(features),
+            "class_counts": class_counts,
+            "validation_accuracy": accuracy,
+            "validation_images": len(y_test),
+        }
+        joblib.dump(bundle, self.model_path)
+        self.model = bundle
+        return bundle
+
     def train(self):
+        if self.image_dataset_path.is_dir():
+            return self.train_from_directory(self.image_dataset_path)
         dataset = self._load_dataset()
         X = []
         y = []
@@ -155,23 +217,44 @@ class PlantDiseaseModel:
     def load_or_train(self):
         if self.model is not None:
             return self.model
-
+        if self.image_dataset_path.is_dir():
+            if not self.model_path.exists() or max(
+                (path.stat().st_mtime for path in self.image_dataset_path.rglob("*") if path.is_file()),
+                default=0,
+            ) > self.model_path.stat().st_mtime:
+                return self.train_from_directory(self.image_dataset_path)
         if self.model_path.exists():
             self.model = joblib.load(self.model_path)
+            if isinstance(self.model, dict) and self.model.get("kind") == "plant_disease_folders_v1":
+                return self.model
             if getattr(self.model, "n_features_in_", None) == 9:
                 return self.model
             self.model = None
-
         return self.train()
 
     def predict(self, image: Image.Image):
-        model = self.load_or_train()
+        loaded = self.load_or_train()
+        if isinstance(loaded, dict) and loaded.get("kind") == "plant_disease_folders_v1":
+            model = loaded["classifier"]
+            warning = (
+                f"Prototype image model trained on {loaded['dataset_images']} labelled images; "
+                f"held-out validation accuracy {loaded['validation_accuracy']:.1%}. "
+                "This dataset score is not a field diagnosis; confirm with an agricultural expert."
+            )
+        else:
+            model = loaded
+            warning = "Prototype classifier trained on synthetic samples; this is not a diagnosis. Confirm with a local agronomist."
         features = self._extract_features(image).reshape(1, -1)
         probabilities = model.predict_proba(features)[0]
         label = str(model.classes_[int(np.argmax(probabilities))])
         confidence = float(np.max(probabilities))
 
-        info = DISEASE_INFO.get(label, DISEASE_INFO["Healthy"])
+        info = DISEASE_INFO.get(label, {
+            "severity": "Needs expert review",
+            "symptoms": "The image model matched this dataset class; verify symptoms in the field.",
+            "treatment": "Do not apply pesticide based only on this model output. Confirm the disease with a local agricultural expert.",
+            "prevention": "Use field scouting, clean tools, and locally recommended integrated pest management.",
+        })
 
         return {
             "predictedDisease": label,
@@ -182,7 +265,7 @@ class PlantDiseaseModel:
             "treatment": info["treatment"],
             "prevention": info["prevention"],
             "affectedCropParts": ["Leaves", "Stem"] if label != "Healthy" else ["Whole plant"],
-            "warning": "Prototype classifier trained on synthetic samples; this is not a diagnosis. Confirm with a local agronomist before treatment." if label != "Healthy" else "Prototype classifier trained on synthetic samples; this is not a diagnosis. Confirm crop health in the field.",
+            "warning": warning,
         }
 
 
@@ -193,6 +276,7 @@ class CropRecommendationModel:
         self.model_dir.mkdir(exist_ok=True)
         self.model_path = self.model_dir / "crop_recommendation_model.joblib"
         self.dataset_path = self.model_dir / "crop_recommendation_dataset.json"
+        self.csv_dataset_path = base_dir / "data" / "crop_recommendation.csv"
         self.model = None
 
     def _build_dataset(self):
@@ -249,7 +333,79 @@ class CropRecommendationModel:
             return "North India Plains"
         return "Agro-climatic zone"
 
+    def train_from_csv(self, dataset_path: Path | None = None):
+        """Train from a real, labelled crop suitability CSV dataset."""
+        source = Path(dataset_path or self.csv_dataset_path)
+        if not source.is_file():
+            raise FileNotFoundError(
+                f"Crop dataset not found: {source}. Add crop_recommendation.csv before training."
+            )
+
+        feature_columns = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
+        X, y = [], []
+        with source.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            headers = {str(name).strip().lower(): name for name in (reader.fieldnames or [])}
+            required = feature_columns + ["label"]
+            missing = [name for name in required if name.lower() not in headers]
+            if missing:
+                raise ValueError(
+                    "Dataset is missing required columns: " + ", ".join(missing)
+                )
+            for line_number, row in enumerate(reader, start=2):
+                try:
+                    values = [float(row[headers[name.lower()]]) for name in feature_columns]
+                    label = str(row[headers["label"]] or "").strip()
+                    if not label:
+                        continue
+                except (TypeError, ValueError, KeyError) as exc:
+                    raise ValueError(
+                        f"Invalid numeric feature or crop label on CSV line {line_number}."
+                    ) from exc
+                X.append(values)
+                y.append(label)
+
+        if len(X) < 30 or len(set(y)) < 2:
+            raise ValueError("Use at least 30 labelled rows and at least two crop classes.")
+        class_counts = {label: y.count(label) for label in set(y)}
+        if min(class_counts.values()) < 2:
+            raise ValueError("Each crop class needs at least two rows for stratified validation.")
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            np.asarray(X, dtype=np.float32),
+            np.asarray(y),
+            test_size=0.2,
+            random_state=42,
+            stratify=np.asarray(y),
+        )
+        pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("classifier", RandomForestClassifier(
+                n_estimators=300,
+                random_state=42,
+                class_weight="balanced",
+                min_samples_leaf=2,
+            )),
+        ])
+        pipeline.fit(X_train, y_train)
+        accuracy = float(accuracy_score(y_test, pipeline.predict(X_test)))
+        bundle = {
+            "kind": "crop_csv_v1",
+            "pipeline": pipeline,
+            "feature_columns": feature_columns,
+            "dataset_path": source.name,
+            "dataset_rows": len(X),
+            "crop_classes": sorted(set(y)),
+            "validation_accuracy": accuracy,
+            "validation_rows": len(y_test),
+        }
+        joblib.dump(bundle, self.model_path)
+        self.model = bundle
+        return bundle
+
     def train(self):
+        if self.csv_dataset_path.is_file():
+            return self.train_from_csv(self.csv_dataset_path)
         dataset = self._load_dataset()
         X = []
         y = []
@@ -270,6 +426,9 @@ class CropRecommendationModel:
     def load_or_train(self):
         if self.model is not None:
             return self.model
+        if self.csv_dataset_path.is_file():
+            if not self.model_path.exists() or self.csv_dataset_path.stat().st_mtime > self.model_path.stat().st_mtime:
+                return self.train_from_csv(self.csv_dataset_path)
         if self.model_path.exists():
             self.model = joblib.load(self.model_path)
             return self.model
@@ -285,15 +444,37 @@ class CropRecommendationModel:
         humidity = float(farmer_profile.get("humidity") or 68)
         temperature = float(farmer_profile.get("temperature") or 28)
 
-        features = np.array(
-            [temperature, humidity, rainfall, self._soil_code(soil_type), self._season_code(season), latitude, longitude],
-            dtype=np.float32,
-        ).reshape(1, -1)
-
         model = self.load_or_train()
-        probabilities = model.predict_proba(features)[0]
+        if isinstance(model, dict) and model.get("kind") == "crop_csv_v1":
+            feature_values = [
+                farmer_profile.get("nitrogen"),
+                farmer_profile.get("phosphorus"),
+                farmer_profile.get("potassium"),
+                temperature,
+                humidity,
+                farmer_profile.get("soilPh"),
+                rainfall,
+            ]
+            features = np.asarray([
+                [float(value) if value not in (None, "") else np.nan for value in feature_values]
+            ], dtype=np.float32)
+            probabilities = model["pipeline"].predict_proba(features)[0]
+            classes = model["pipeline"].named_steps["classifier"].classes_
+            dataset_notice = (
+                f"Trained on {model['dataset_rows']} labelled rows from {model['dataset_path']}; "
+                f"held-out validation accuracy {model['validation_accuracy']:.1%} "
+                f"on {model['validation_rows']} rows. This is a dataset benchmark, not a field guarantee."
+            )
+        else:
+            features = np.array(
+                [temperature, humidity, rainfall, self._soil_code(soil_type), self._season_code(season), latitude, longitude],
+                dtype=np.float32,
+            ).reshape(1, -1)
+            probabilities = model.predict_proba(features)[0]
+            classes = model.classes_
+            dataset_notice = "Demo fallback: 18 hand-entered sample rows across 9 crop categories. Add the labelled CSV dataset and retrain before relying on this model."
         predicted_index = int(np.argmax(probabilities))
-        predicted_crop = str(model.classes_[predicted_index])
+        predicted_crop = str(classes[predicted_index])
         confidence = float(probabilities[predicted_index])
 
         info = CROP_RECOMMENDATION_INFO.get(predicted_crop, {
@@ -306,7 +487,7 @@ class CropRecommendationModel:
         reasons = [
             f"{predicted_crop} matches the current {self._location_zone(latitude, longitude).lower()} conditions and farmer input.",
             f"The climate mix of {temperature}°C, {humidity}% humidity, and {rainfall} mm rainfall is favorable for {predicted_crop}.",
-            f"This recommendation is based on a trained crop suitability model across multiple crop datasets and regions.",
+            "Prediction is based on the currently loaded training dataset; local field validation is still required.",
         ]
 
         if crop_name.lower() == predicted_crop.lower():
@@ -314,7 +495,14 @@ class CropRecommendationModel:
         else:
             suitability = "Suggested alternative" if confidence >= 0.5 else "Potential fit"
 
+        ranked_indices = np.argsort(probabilities)[::-1][:3]
+        alternatives = [
+            {"crop": str(classes[int(index)]), "confidencePct": int(float(probabilities[int(index)]) * 100)}
+            for index in ranked_indices
+        ]
+
         return {
+            "alternatives": alternatives,
             "crop": predicted_crop,
             "requestedCrop": crop_name,
             "confidence": round(confidence, 3),
@@ -327,7 +515,7 @@ class CropRecommendationModel:
             "fertilizerAdvice": info["fertilizerAdvice"],
             "risk": info["risk"],
             "yieldExpectation": info["yieldExpectation"],
-            "datasetNotice": "Prototype dataset: 18 labeled records across 9 crop categories. Predictions are not validated for every crop or region.",
+            "datasetNotice": dataset_notice,
             "temperatureC": temperature,
             "humidityPercent": humidity,
             "rainfallMm": rainfall,
