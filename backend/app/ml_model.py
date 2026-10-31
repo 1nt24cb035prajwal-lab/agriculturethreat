@@ -135,79 +135,7 @@ class PlantDiseaseModel:
         features = np.concatenate([mean, std, [brightness, contrast, texture]])
         return features.astype(np.float32)
 
-    def train_from_csv(self, dataset_path: Path | None = None):
-        """Train from a real, labelled crop suitability CSV dataset."""
-        source = Path(dataset_path or self.csv_dataset_path)
-        if not source.is_file():
-            raise FileNotFoundError(
-                f"Crop dataset not found: {source}. Add crop_recommendation.csv before training."
-            )
-
-        feature_columns = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
-        X, y = [], []
-        with source.open("r", encoding="utf-8-sig", newline="") as handle:
-            reader = csv.DictReader(handle)
-            headers = {str(name).strip().lower(): name for name in (reader.fieldnames or [])}
-            required = feature_columns + ["label"]
-            missing = [name for name in required if name.lower() not in headers]
-            if missing:
-                raise ValueError(
-                    "Dataset is missing required columns: " + ", ".join(missing)
-                )
-            for line_number, row in enumerate(reader, start=2):
-                try:
-                    values = [float(row[headers[name.lower()]]) for name in feature_columns]
-                    label = str(row[headers["label"]] or "").strip()
-                    if not label:
-                        continue
-                except (TypeError, ValueError, KeyError) as exc:
-                    raise ValueError(
-                        f"Invalid numeric feature or crop label on CSV line {line_number}."
-                    ) from exc
-                X.append(values)
-                y.append(label)
-
-        if len(X) < 30 or len(set(y)) < 2:
-            raise ValueError("Use at least 30 labelled rows and at least two crop classes.")
-        class_counts = {label: y.count(label) for label in set(y)}
-        if min(class_counts.values()) < 2:
-            raise ValueError("Each crop class needs at least two rows for stratified validation.")
-
-        X_train, X_test, y_train, y_test = train_test_split(
-            np.asarray(X, dtype=np.float32),
-            np.asarray(y),
-            test_size=0.2,
-            random_state=42,
-            stratify=np.asarray(y),
-        )
-        pipeline = Pipeline([
-            ("imputer", SimpleImputer(strategy="median")),
-            ("classifier", RandomForestClassifier(
-                n_estimators=300,
-                random_state=42,
-                class_weight="balanced",
-                min_samples_leaf=2,
-            )),
-        ])
-        pipeline.fit(X_train, y_train)
-        accuracy = float(accuracy_score(y_test, pipeline.predict(X_test)))
-        bundle = {
-            "kind": "crop_csv_v1",
-            "pipeline": pipeline,
-            "feature_columns": feature_columns,
-            "dataset_path": source.name,
-            "dataset_rows": len(X),
-            "crop_classes": sorted(set(y)),
-            "validation_accuracy": accuracy,
-            "validation_rows": len(y_test),
-        }
-        joblib.dump(bundle, self.model_path)
-        self.model = bundle
-        return bundle
-
     def train(self):
-        if self.csv_dataset_path.is_file():
-            return self.train_from_csv(self.csv_dataset_path)
         dataset = self._load_dataset()
         X = []
         y = []
@@ -327,7 +255,79 @@ class CropRecommendationModel:
             return "North India Plains"
         return "Agro-climatic zone"
 
+    def train_from_csv(self, dataset_path: Path | None = None):
+        """Train from a real, labelled crop suitability CSV dataset."""
+        source = Path(dataset_path or self.csv_dataset_path)
+        if not source.is_file():
+            raise FileNotFoundError(
+                f"Crop dataset not found: {source}. Add crop_recommendation.csv before training."
+            )
+
+        feature_columns = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
+        X, y = [], []
+        with source.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            headers = {str(name).strip().lower(): name for name in (reader.fieldnames or [])}
+            required = feature_columns + ["label"]
+            missing = [name for name in required if name.lower() not in headers]
+            if missing:
+                raise ValueError(
+                    "Dataset is missing required columns: " + ", ".join(missing)
+                )
+            for line_number, row in enumerate(reader, start=2):
+                try:
+                    values = [float(row[headers[name.lower()]]) for name in feature_columns]
+                    label = str(row[headers["label"]] or "").strip()
+                    if not label:
+                        continue
+                except (TypeError, ValueError, KeyError) as exc:
+                    raise ValueError(
+                        f"Invalid numeric feature or crop label on CSV line {line_number}."
+                    ) from exc
+                X.append(values)
+                y.append(label)
+
+        if len(X) < 30 or len(set(y)) < 2:
+            raise ValueError("Use at least 30 labelled rows and at least two crop classes.")
+        class_counts = {label: y.count(label) for label in set(y)}
+        if min(class_counts.values()) < 2:
+            raise ValueError("Each crop class needs at least two rows for stratified validation.")
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            np.asarray(X, dtype=np.float32),
+            np.asarray(y),
+            test_size=0.2,
+            random_state=42,
+            stratify=np.asarray(y),
+        )
+        pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("classifier", RandomForestClassifier(
+                n_estimators=300,
+                random_state=42,
+                class_weight="balanced",
+                min_samples_leaf=2,
+            )),
+        ])
+        pipeline.fit(X_train, y_train)
+        accuracy = float(accuracy_score(y_test, pipeline.predict(X_test)))
+        bundle = {
+            "kind": "crop_csv_v1",
+            "pipeline": pipeline,
+            "feature_columns": feature_columns,
+            "dataset_path": source.name,
+            "dataset_rows": len(X),
+            "crop_classes": sorted(set(y)),
+            "validation_accuracy": accuracy,
+            "validation_rows": len(y_test),
+        }
+        joblib.dump(bundle, self.model_path)
+        self.model = bundle
+        return bundle
+
     def train(self):
+        if self.csv_dataset_path.is_file():
+            return self.train_from_csv(self.csv_dataset_path)
         dataset = self._load_dataset()
         X = []
         y = []
