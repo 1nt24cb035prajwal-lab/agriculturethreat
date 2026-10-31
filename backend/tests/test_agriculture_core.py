@@ -78,6 +78,7 @@ def test_disease_analysis_accepts_crop_and_location_metadata():
         files={"file": ("leaf.png", image_bytes, "image/png")},
         data={
             "cropName": "Tomato",
+            "cropStage": "Flowering",
             "state": "Tamil Nadu",
             "district": "Coimbatore",
             "village": "Hunsur",
@@ -89,6 +90,7 @@ def test_disease_analysis_accepts_crop_and_location_metadata():
     payload = response.json()
     assert payload["result"]["predictedDisease"]
     assert payload["result"]["cropName"] == "Tomato"
+    assert payload["result"]["cropStage"] == "Flowering"
     assert payload["result"]["location"]["district"] == "Coimbatore"
     assert payload["result"]["location"]["village"] == "Hunsur"
     image_id = payload["result"]["imageId"]

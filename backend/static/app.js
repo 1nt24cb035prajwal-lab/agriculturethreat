@@ -413,6 +413,9 @@ const saveFarmProfile = async () => {
 const analyzeDisease = async (event) => {
   event.preventDefault();
   const file = diseaseImageInput.files[0];
+  const savedCrop = cropRecommendationForm.elements.namedItem('cropName').value;
+  const diseaseCropInput = document.getElementById('diseaseCropName');
+  if (!diseaseCropInput.value.trim() && savedCrop) diseaseCropInput.value = savedCrop;
 
   if (!file) {
     diseaseResult.textContent = 'Please select a crop image from the camera or gallery.';
@@ -422,12 +425,14 @@ const analyzeDisease = async (event) => {
   const formData = new FormData();
   formData.append('file', file);
   const cropMetadata = new FormData(cropRecommendationForm);
-  formData.append('cropName', cropMetadata.get('cropName') || 'General crop');
-  formData.append('state', cropMetadata.get('state') || 'Karnataka');
-  formData.append('district', cropMetadata.get('district') || 'Mysuru');
-  formData.append('village', cropMetadata.get('village') || 'Hunsur');
-  formData.append('latitude', cropMetadata.get('latitude') || 12.3);
-  formData.append('longitude', cropMetadata.get('longitude') || 76.6);
+  const diseaseCropName = document.getElementById('diseaseCropName').value.trim() || cropMetadata.get('cropName') || '';
+  const diseaseCropStage = document.getElementById('diseaseCropStage').value;
+  if (diseaseCropName) formData.append('cropName', diseaseCropName);
+  if (diseaseCropStage) formData.append('cropStage', diseaseCropStage);
+  for (const field of ['state', 'district', 'village', 'latitude', 'longitude']) {
+    const value = cropMetadata.get(field);
+    if (value !== null && String(value).trim() !== '') formData.append(field, value);
+  }
 
   diseaseResult.textContent = 'Analyzing crop image...';
 
