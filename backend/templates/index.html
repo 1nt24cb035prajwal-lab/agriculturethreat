@@ -123,46 +123,14 @@
               <li>Transparent provider and data status</li>
             </ul>
           </div>
-          <div class="auth-box" id="authBox">
-            <div class="auth-tabs">
-              <button class="tab active" data-tab="login">Farmer Login</button>
-              <button class="tab" data-tab="register">Register</button>
+          <div class="auth-box google-auth-box" id="authBox">
+            <div class="google-auth-content">
+              <p class="eyebrow">Secure farmer access</p>
+              <h2>Sign in with Google</h2>
+              <p>Use your Google account to create or access your farmer profile. After signing in, save your farm, crop, soil, and location details.</p>
+              <button class="primary-btn full" id="googleLoginButton" type="button">Continue with Google</button>
+              <p class="map-status">New farmers are registered automatically after Google verifies their email address. No phone OTP or password is required.</p>
             </div>
-
-            <form id="loginForm" class="auth-form active">
-              <label>Phone Number or Email<input type="text" name="identifier" autocomplete="username" required /></label>
-              <label>Password<input type="password" name="password" autocomplete="current-password" required /></label>
-              <button class="primary-btn full" type="submit">Login</button>
-              <button class="secondary-btn full" id="googleLoginButton" type="button">Continue with Google</button>
-              <a href="#" class="link-text" id="forgotPassword">Forgot Password?</a>
-            </form>
-
-            <form id="registerForm" class="auth-form">
-              <div class="two-col">
-                <label>Full Name<input type="text" name="fullName" autocomplete="name" required /></label>
-                <label>Mobile<input type="tel" name="mobile" id="registrationMobile" autocomplete="tel" placeholder="+919876543210" required /></label>
-              </div>
-              <div class="two-col">
-                <label>Email<input type="email" name="email" autocomplete="email" required /></label>
-                <label>Password<input type="password" name="password" autocomplete="new-password" minlength="10" required /></label>
-              </div>
-              <label>Confirm Password<input type="password" name="confirmPassword" autocomplete="new-password" minlength="10" required /></label>
-              <div class="two-col">
-                <label>State<input type="text" name="state" required /></label>
-                <label>District<input type="text" name="district" required /></label>
-              </div>
-              <div class="two-col">
-                <label>Village<input type="text" name="village" /></label>
-                <label>Farm Name<input type="text" name="farmName" required /></label>
-              </div>
-              <div class="two-col otp-controls">
-                <label>Phone OTP<input type="text" id="registrationOtp" inputmode="numeric" autocomplete="one-time-code" placeholder="Enter verification code" /></label>
-                <div class="location-actions"><button class="secondary-btn" id="sendOtpButton" type="button">Send OTP</button><button class="secondary-btn" id="verifyOtpButton" type="button">Verify OTP</button></div>
-              </div>
-              <p id="otpStatus" class="map-status">Phone verification becomes mandatory when Twilio Verify is configured.</p>
-              <label class="terms-check"><input type="checkbox" name="termsAccepted" required /> I accept the Terms and Conditions</label>
-              <button class="primary-btn full" type="submit">Register Farmer</button>
-            </form>
           </div>
         </section>
 
