@@ -1,6 +1,3 @@
-const authTabs = document.querySelectorAll('.tab');
-const loginForm = document.getElementById('loginForm');
-const registerForm = document.getElementById('registerForm');
 const dashboardSection = document.getElementById('dashboardSection');
 const adminSection = document.getElementById('adminSection');
 const authBox = document.getElementById('authBox');
@@ -80,16 +77,6 @@ const toneClassMap = {
   purple: 'purple'
 };
 
-const showTab = (tabName) => {
-  authTabs.forEach((tab) => {
-    const isActive = tab.dataset.tab === tabName;
-    tab.classList.toggle('active', isActive);
-  });
-
-  loginForm.classList.toggle('active', tabName === 'login');
-  registerForm.classList.toggle('active', tabName === 'register');
-};
-
 const renderDashboard = (dashboard, weather = null, water = null) => {
   const { farmer, farm, integrations } = dashboard;
   welcomeMessage.textContent = dashboard.welcome;
@@ -129,7 +116,7 @@ const renderDashboard = (dashboard, weather = null, water = null) => {
   document.getElementById('settingsSummary').innerHTML = `
     <div><strong>Farmer:</strong> ${escapeHtml(farmer.name)}</div>
     <div><strong>Email:</strong> ${escapeHtml(farmer.email)}</div>
-    <div><strong>Phone:</strong> ${escapeHtml(farmer.mobile)} · ${farmer.phoneVerified ? 'Verified' : 'Not verified'}</div>
+    <div><strong>Phone:</strong> ${escapeHtml(farmer.mobile)} · ${farmer.phoneVerified ? 'Verified' : 'Not provided'}</div>
     <div><strong>Farm:</strong> ${escapeHtml(farm.farmName || 'Not saved')}</div>
     <div><strong>Location:</strong> ${escapeHtml(location)}</div>
   `;
@@ -268,7 +255,6 @@ const renderCurrentPage = async () => {
   if (page === 'home' || page === 'login' || page === 'register') {
     dashboardSection.classList.add('hidden');
     authBox.classList.remove('hidden');
-    showTab(page === 'register' ? 'register' : 'login');
     document.title = page === 'home' ? 'Agriculture Threat Fusion' : `${page === 'login' ? 'Farmer Login' : 'Farmer Registration'} | Agriculture Threat Fusion`;
     return;
   }
@@ -294,63 +280,6 @@ const renderCurrentPage = async () => {
   document.getElementById('downloadReportButton').classList.toggle('hidden', page !== 'reports');
   if (page === 'yield') { loadYieldEstimate(); loadMarketPrices(); }
   if (page === 'satellite') loadSatelliteNdvi();
-};
-
-const login = async (event) => {
-  event.preventDefault();
-  const formData = new FormData(loginForm);
-  const payload = {
-    identifier: formData.get('identifier'),
-    password: formData.get('password')
-  };
-
-  try {
-    await api.post('/api/auth/login', payload);
-    navigateTo('/dashboard');
-  } catch (error) {
-    alert(error.message || 'Invalid credentials');
-  }
-};
-
-const register = async (event) => {
-  event.preventDefault();
-  const formData = new FormData(registerForm);
-  if (formData.get('password') !== formData.get('confirmPassword')) {
-    alert('Passwords do not match.');
-    return;
-  }
-  const payload = {
-    fullName: formData.get('fullName'),
-    mobile: formData.get('mobile'),
-    email: formData.get('email'),
-    password: formData.get('password'),
-    state: formData.get('state'),
-    district: formData.get('district'),
-    village: formData.get('village'),
-    farmName: formData.get('farmName'),
-    termsAccepted: formData.get('termsAccepted') === 'on'
-  };
-
-  try {
-    const result = await api.post('/api/auth/register', payload);
-    document.querySelector('#loginForm [name="identifier"]').value = payload.mobile;
-    alert(`${result.message} Sign in with your phone or email and password.`);
-    showTab('login');
-    navigateTo('/login');
-  } catch (error) {
-    alert(error.message || 'Unable to register');
-  }
-};
-
-const resetPassword = async (event) => {
-  event.preventDefault();
-  const identifier = document.querySelector('#loginForm input[name="identifier"]').value;
-  try {
-    const result = await api.post('/api/auth/forgot-password', { identifier });
-    alert(result.message);
-  } catch (error) {
-    alert(error.message || 'Unable to reset password');
-  }
 };
 
 const logout = () => {
@@ -705,30 +634,12 @@ const primarySecondary = document.getElementById('ctaPrimary');
 const loginButton = document.getElementById('loginButton');
 const ctaSecondary = document.getElementById('ctaSecondary');
 const logoutButton = document.getElementById('logoutButton');
-const forgotPassword = document.getElementById('forgotPassword');
 
 document.getElementById('googleLoginButton').addEventListener('click', () => { window.location.href = '/auth/google/start'; });
-document.getElementById('sendOtpButton').addEventListener('click', async () => {
-  const mobile = document.getElementById('registrationMobile').value.trim();
-  const status = document.getElementById('otpStatus');
-  try { const result = await api.post('/api/auth/otp/send', { mobile }); status.textContent = result.message; }
-  catch (error) { status.textContent = error.message; }
-});
-document.getElementById('verifyOtpButton').addEventListener('click', async () => {
-  const mobile = document.getElementById('registrationMobile').value.trim();
-  const code = document.getElementById('registrationOtp').value.trim();
-  const status = document.getElementById('otpStatus');
-  try { const result = await api.post('/api/auth/otp/verify', { mobile, code }); status.textContent = result.message; status.dataset.verified = 'true'; }
-  catch (error) { status.textContent = error.message; status.dataset.verified = 'false'; }
-});
 document.getElementById('loadYieldButton').addEventListener('click', loadYieldEstimate);
 document.getElementById('loadMarketsButton').addEventListener('click', loadMarketPrices);
 document.getElementById('loadSatelliteButton').addEventListener('click', loadSatelliteNdvi);
 
-authTabs.forEach((tab) => tab.addEventListener('click', () => navigateTo(tab.dataset.tab === 'register' ? '/register' : '/login')));
-loginForm.addEventListener('submit', login);
-registerForm.addEventListener('submit', register);
-forgotPassword.addEventListener('click', resetPassword);
 logoutButton.addEventListener('click', logout);
 diseaseForm.addEventListener('submit', analyzeDisease);
 cropRecommendationForm.addEventListener('submit', generateRecommendation);
