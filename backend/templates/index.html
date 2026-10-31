@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agriculture Threat Fusion</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=20261030" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand-wrap">
+          <div class="brand-icon">🌾</div>
+          <div>
+            <p class="brand-title">Agriculture Threat Fusion</p>
+            <p class="brand-subtitle">Smart Farming Intelligence</p>
+          </div>
+        </div>
+        <nav class="nav-links">
+          <a href="#about">About</a>
+          <a href="#features">Features</a>
+          <a href="#workflow">How it Works</a>
+          <a href="#contact">Contact</a>
+        </nav>
+        <div class="nav-action">
+          <button class="secondary-btn" id="loginButton">Farmer Login</button>
+          <button class="primary-btn" id="startButton">Get Started</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">AI-powered agricultural threat intelligence</p>
+            <h1>Smart Farming Starts with Intelligent Threat Detection</h1>
+            <p class="lead">
+              Monitor your crops, detect agricultural threats, predict diseases, optimize water usage, and improve your crop yield with AI-powered agriculture intelligence.
+            </p>
+            <div class="cta-row">
+              <button class="primary-btn large" id="ctaPrimary">Get Started</button>
+              <button class="secondary-btn large" id="ctaSecondary">Farmer Login</button>
+            </div>
+            <div class="mini-stats">
+              <div><strong>12.5K</strong><span>Farmers</span></div>
+              <div><strong>91%</strong><span>Model Accuracy</span></div>
+              <div><strong>24/7</strong><span>Threat Alerts</span></div>
+            </div>
+          </div>
+          <div class="hero-visual">
+            <div class="visual-card weather-card">
+              <div class="card-header"><span>Current Weather</span><span>🌤️</span></div>
+              <div class="big-temp">31°C</div>
+              <div class="weather-meta">Humidity 68% · Rainfall 12 mm</div>
+            </div>
+            <div class="crop-glow"></div>
+          </div>
+        </section>
+
+        <section id="about" class="info-section">
+          <div class="section-head">
+            <p class="eyebrow">About the platform</p>
+            <h2>One farm intelligence dashboard for every crop decision.</h2>
+          </div>
+          <div class="about-grid">
+            <div class="text-panel">
+              Agriculture Threat Fusion brings together weather intelligence, vegetation monitoring, crop disease detection, water planning, and threat analytics to help farmers make practical decisions before losses occur.
+            </div>
+            <div class="metric-panel">
+              <div class="metric-box">
+                <span>Crop Health</span>
+                <strong>84%</strong>
+              </div>
+              <div class="metric-box">
+                <span>Yield Confidence</span>
+                <strong>6.2 t/acre</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="features" class="feature-section">
+          <div class="section-head center">
+            <p class="eyebrow">Key Capabilities</p>
+            <h2>Powerful features for safer farming</h2>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card"><span>🩺</span><h3>Crop Disease Detection</h3><p>AI-based disease predictions based on crop, symptoms, weather, and imagery.</p></article>
+            <article class="feature-card"><span>⛅</span><h3>Weather Monitoring</h3><p>Live weather tracking and short-term risk alerts for rainfall, humidity, and heat stress.</p></article>
+            <article class="feature-card"><span>🛰️</span><h3>Satellite Vegetation Analysis</h3><p>NDVI health maps to compare green cover over time and identify stress areas.</p></article>
+            <article class="feature-card"><span>💧</span><h3>Water Requirement Prediction</h3><p>Manage irrigation scheduling and identify risk of water deficiency or excess.</p></article>
+            <article class="feature-card"><span>🌱</span><h3>Fertilizer Recommendations</h3><p>Soil based NPK suggestions and biofertilizer guidance for crop health.</p></article>
+            <article class="feature-card"><span>📈</span><h3>Crop Yield Prediction</h3><p>Forecast production based on weather, soil, and crop performance indicators.</p></article>
+            <article class="feature-card"><span>🚨</span><h3>Agricultural Threat Alerts</h3><p>Get prioritized alerts for disease, drought, pest risk, and flooding hazards.</p></article>
+          </div>
+        </section>
+
+        <section id="workflow" class="workflow-section">
+          <div class="section-head center">
+            <p class="eyebrow">How it works</p>
+            <h2>From registration to field action</h2>
+          </div>
+          <div class="workflow-grid">
+            <div class="step"><span>1</span><h3>Farmer Registration</h3><p>Create a profile and add farm details.</p></div>
+            <div class="step"><span>2</span><h3>Monitor Field Data</h3><p>Weather, crop health, and satellite insights are updated automatically.</p></div>
+            <div class="step"><span>3</span><h3>Predict & Prevent</h3><p>AI identifies threat signals and recommends the next action.</p></div>
+            <div class="step"><span>4</span><h3>Reports & Alerts</h3><p>Track yield, threats, and seasonal insights in a single dashboard.</p></div>
+          </div>
+        </section>
+
+        <section class="auth-section">
+          <div class="auth-box" id="authBox">
+            <div class="auth-tabs">
+              <button class="tab active" data-tab="login">Farmer Login</button>
+              <button class="tab" data-tab="register">Register</button>
+            </div>
+
+            <form id="loginForm" class="auth-form active">
+              <label>Mobile Number<input type="text" name="mobile" value="+91 98765 43210" /></label>
+              <label>Password<input type="password" name="password" value="demo123" /></label>
+              <button class="primary-btn full" type="submit">Login</button>
+              <a href="#" class="link-text" id="forgotPassword">Forgot Password?</a>
+            </form>
+
+            <form id="registerForm" class="auth-form">
+              <div class="two-col">
+                <label>Full Name<input type="text" name="fullName" placeholder="Farmer name" /></label>
+                <label>Mobile<input type="text" name="mobile" placeholder="+91 ..." /></label>
+              </div>
+              <div class="two-col">
+                <label>Email<input type="email" name="email" placeholder="name@example.com" /></label>
+                <label>Password<input type="password" name="password" placeholder="Password" /></label>
+              </div>
+              <div class="two-col">
+                <label>State<input type="text" name="state" placeholder="State" /></label>
+                <label>District<input type="text" name="district" placeholder="District" /></label>
+              </div>
+              <div class="two-col">
+                <label>Village<input type="text" name="village" placeholder="Village" /></label>
+                <label>Farm Name<input type="text" name="farmName" placeholder="Farm Name" /></label>
+              </div>
+              <button class="primary-btn full" type="submit">Register Farmer</button>
+            </form>
+          </div>
+        </section>
+
+        <section class="dashboard-section hidden" id="dashboardSection">
+          <div class="dashboard-header">
+            <div>
+              <p class="eyebrow">Farmer dashboard</p>
+              <h2 id="welcomeMessage">Welcome</h2>
+            </div>
+            <button class="secondary-btn" id="logoutButton">Logout</button>
+          </div>
+
+          <div class="dashboard-grid" id="dashboardCards"></div>
+
+          <div class="two-col-layout">
+            <div class="panel">
+              <div class="panel-title">Weather Forecast</div>
+              <div id="weatherForecast" class="forecast-list"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">Vegetation Status</div>
+              <div id="vegetationMap" class="vegetation-map"></div>
+            </div>
+          </div>
+
+          <div class="two-col-layout">
+            <div class="panel">
+              <div class="panel-title">Crop Growth & Yield</div>
+              <div id="growthChart" class="bar-chart"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">Threat Alerts</div>
+              <div id="threatList" class="list-stack"></div>
+            </div>
+          </div>
+
+          <div class="panel wide-panel">
+            <div class="panel-title">AI and Farm Recommendations</div>
+            <div id="recommendationSummary" class="recommendation-box"></div>
+          </div>
+
+          <div class="panel wide-panel">
+            <div class="panel-title">Farm Location & Crop Recommendation</div>
+            <form id="cropRecommendationForm" class="recommendation-form">
+              <div class="two-col">
+                <label>Farmer Name<input type="text" name="fullName" value="Ananya Gowda" required /></label>
+                <label>Current Crop<input type="text" name="cropName" value="Rice" placeholder="Rice, Wheat, Maize..." required /></label>
+              </div>
+              <div class="two-col">
+                <label>State<input type="text" name="state" value="Karnataka" required /></label>
+                <label>District<input type="text" name="district" value="Mysuru" required /></label>
+              </div>
+              <div class="two-col">
+                <label>Village<input type="text" name="village" value="Hunsur" /></label>
+                <label>Soil Type<select name="soilType"><option>Black Soil</option><option>Clay Loam</option><option>Red Soil</option><option>Loam</option><option>Sandy Loam</option><option>Alluvial</option></select></label>
+              </div>
+              <div class="two-col">
+                <label>Season<select name="season"><option>Kharif</option><option>Rabi</option><option>Summer</option></select></label>
+                <label>Land Area (acres)<input type="number" min="0.1" step="0.1" name="landArea" value="12.5" /></label>
+              </div>
+              <div class="two-col">
+                <label>Seasonal Rainfall (mm)<input type="number" min="0" step="1" name="rainfall" value="750" /></label>
+                <label>Average Temperature (°C)<input type="number" min="-10" max="60" step="0.1" name="temperature" value="28" /></label>
+              </div>
+              <label>Average Humidity (%)<input type="number" min="0" max="100" step="1" name="humidity" value="68" /></label>
+              <div class="two-col">
+                <label>Latitude<input type="number" min="-90" max="90" step="any" name="latitude" value="12.3" required /></label>
+                <label>Longitude<input type="number" min="-180" max="180" step="any" name="longitude" value="76.6" required /></label>
+              </div>
+              <div class="map-toolbar">
+                <span>Farm coordinates</span>
+                <button class="secondary-btn" id="locateFarmButton" type="button">Use my location</button>
+              </div>
+              <div id="farmMap" aria-label="Farm location map"></div>
+              <p id="mapStatus" class="map-status">Choose a point on the map or enter coordinates above.</p>
+              <button class="primary-btn" type="submit">Generate Recommendation</button>
+            </form>
+            <div id="recommendationResult" class="disease-result">Add your farm location and crop to generate a location-aware recommendation.</div>
+          </div>
+
+          <div class="panel wide-panel">
+            <div class="panel-title">Crop Disease Camera Detection</div>
+            <form id="diseaseForm" class="disease-form">
+              <input type="file" id="diseaseImage" name="file" accept="image/*" capture="environment" />
+              <p class="map-status">Image analysis will use the crop and farm location above.</p>
+              <button class="primary-btn" type="submit">Detect Disease</button>
+            </form>
+            <div id="diseaseResult" class="disease-result">Upload a crop photo to run AI disease detection.</div>
+          </div>
+        </section>
+
+        <section class="admin-section hidden" id="adminSection">
+          <div class="dashboard-header">
+            <div>
+              <p class="eyebrow">Admin dashboard</p>
+              <h2>System Monitoring</h2>
+            </div>
+          </div>
+          <div class="admin-grid" id="adminStats"></div>
+        </section>
+      </main>
+
+      <footer id="contact" class="footer">
+        <div>
+          <h3>Contact us</h3>
+          <p>support@agriculturethreatfusion.ai</p>
+        </div>
+        <div>
+          <h3>Location</h3>
+          <p>Bengaluru, Karnataka</p>
+        </div>
+        <div>
+          <h3>Languages</h3>
+          <p>English · Kannada</p>
+        </div>
+      </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/app.js?v=20261030"></script>
+  </body>
+</html>
