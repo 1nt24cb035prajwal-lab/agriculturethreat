@@ -127,9 +127,9 @@ async def fetch_sentinel_ndvi(latitude: float, longitude: float) -> dict[str, An
             ndvi = float(values[0])
         elif isinstance(payload.get("data"), dict):
             ndvi = payload["data"].get("ndvi")
-    if ndvi is None:
-        raise ProviderUnavailable("Sentinel Hub response contained no NDVI sample for this farm point.")
-    return {"ndvi": round(ndvi, 3), "source": "Sentinel Hub Sentinel-2 L2A", "retrievedAt": date.today().isoformat(), "windowDays": 45, "cloudCoverageMaxPercent": 35, "coordinates": {"latitude": latitude, "longitude": longitude}, "notice": "Single farm-point sample; cloud filtering and a 45-day search window apply. Not a whole-field average."}
+    if ndvi is None or not -1 <= float(ndvi) <= 1:
+        raise ProviderUnavailable("Sentinel Hub returned no valid NDVI sample for this farm point (possibly cloud or no-data pixels).")
+    return {"ndvi": round(float(ndvi), 3), "source": "Sentinel Hub Sentinel-2 L2A", "retrievedAt": date.today().isoformat(), "windowDays": 45, "cloudCoverageMaxPercent": 35, "coordinates": {"latitude": latitude, "longitude": longitude}, "notice": "Single farm-point sample; cloud filtering and a 45-day search window apply. Not a whole-field average."}
 
 
 async def fetch_market_prices(state: str, district: str, commodity: str, limit: int = 10) -> dict[str, Any]:
