@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="/static/styles.css?v=20261030" />
+    <link rel="stylesheet" href="/static/styles.css?v=20261031" />
   </head>
   <body>
     <div class="page-shell">
@@ -133,13 +133,14 @@
               <label>Phone Number or Email<input type="text" name="identifier" autocomplete="username" required /></label>
               <label>Password<input type="password" name="password" autocomplete="current-password" required /></label>
               <button class="primary-btn full" type="submit">Login</button>
+              <button class="secondary-btn full" id="googleLoginButton" type="button">Continue with Google</button>
               <a href="#" class="link-text" id="forgotPassword">Forgot Password?</a>
             </form>
 
             <form id="registerForm" class="auth-form">
               <div class="two-col">
                 <label>Full Name<input type="text" name="fullName" autocomplete="name" required /></label>
-                <label>Mobile<input type="tel" name="mobile" autocomplete="tel" required /></label>
+                <label>Mobile<input type="tel" name="mobile" id="registrationMobile" autocomplete="tel" placeholder="+919876543210" required /></label>
               </div>
               <div class="two-col">
                 <label>Email<input type="email" name="email" autocomplete="email" required /></label>
@@ -154,6 +155,11 @@
                 <label>Village<input type="text" name="village" /></label>
                 <label>Farm Name<input type="text" name="farmName" required /></label>
               </div>
+              <div class="two-col otp-controls">
+                <label>Phone OTP<input type="text" id="registrationOtp" inputmode="numeric" autocomplete="one-time-code" placeholder="Enter verification code" /></label>
+                <div class="location-actions"><button class="secondary-btn" id="sendOtpButton" type="button">Send OTP</button><button class="secondary-btn" id="verifyOtpButton" type="button">Verify OTP</button></div>
+              </div>
+              <p id="otpStatus" class="map-status">Phone verification becomes mandatory when Twilio Verify is configured.</p>
               <label class="terms-check"><input type="checkbox" name="termsAccepted" required /> I accept the Terms and Conditions</label>
               <button class="primary-btn full" type="submit">Register Farmer</button>
             </form>
@@ -195,13 +201,22 @@
             <div class="panel" data-feature-view="satellite">
               <div class="panel-title">Vegetation Status</div>
               <div id="vegetationMap" class="vegetation-map"></div>
+              <button class="secondary-btn" id="loadSatelliteButton" type="button">Fetch Sentinel-2 NDVI</button>
             </div>
+          </div>
+
+          <div class="panel wide-panel" data-feature-view="yield">
+            <div class="panel-title">Nearby mandi prices</div>
+            <div class="two-col"><label>Commodity<input id="marketCommodity" type="text" placeholder="Use saved crop or enter commodity" /></label><div class="location-actions"><button class="secondary-btn" id="loadMarketsButton" type="button">Fetch live mandi prices</button></div></div>
+            <div id="marketResult" class="list-stack"></div>
           </div>
 
           <div class="two-col-layout">
             <div class="panel" data-feature-view="yield">
               <div class="panel-title">Crop Growth & Yield</div>
               <div id="growthChart" class="bar-chart"></div>
+              <button class="secondary-btn" id="loadYieldButton" type="button">Estimate Crop Yield</button>
+              <div id="yieldResult" class="recommendation-box"></div>
             </div>
             <div class="panel" data-feature-view="threats">
               <div class="panel-title">Threat Alerts</div>
@@ -349,6 +364,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="/static/app.js?v=20261030"></script>
+    <script src="/static/app.js?v=20261031"></script>
   </body>
 </html>
