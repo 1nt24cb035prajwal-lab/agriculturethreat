@@ -1,39 +1,77 @@
-# agriculturethreat
-
 # Agriculture Threat Fusion
 
-A demo-ready full-stack agriculture monitoring prototype built to match the requested workflow: farmer registration, weather monitoring, disease prediction, water recommendations, fertilizer insights, yield forecasting, and agricultural threat detection.
+A full-stack agriculture monitoring prototype for farmer profiles, crop recommendations, disease-image review, weather, water planning, satellite NDVI, mandi prices, yield estimates, and saved activity.
 
 ## Run locally
 
-1. Create and activate a virtual environment.
-2. Install dependencies:
-   `pip install -r backend/requirements.txt`
-3. Start the app:
-   `uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload`
-4. Open http://localhost:8000
+From the repository root:
 
-## Project structure
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r backend\test-requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload
+```
 
-- `backend/` - FastAPI server and static frontend assets
-- `frontend/` - React/Vite scaffold aligned with the requested stack
+Open http://localhost:8000.
 
-The authenticated dashboard reads each farmer's saved farm profile and activity. External feeds that are not configured are displayed as unavailable; they are not returned as plausible-looking sample measurements. Crop and image models remain prototype ML outputs.
+To load local provider settings, copy `backend/.env.example` to `backend/.env` and start with:
 
-## Accounts and persistence
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload --env-file backend\.env
+```
 
-Farmer accounts, PBKDF2 password hashes, HTTP-only login sessions, farm profiles, and activity history are stored in SQLite at `backend/agriculture.sqlite3` by default. Set `AGRI_DATABASE_PATH` to choose another database file. Set `COOKIE_SECURE=true` when serving the app over HTTPS. Do not expose the development server directly to the public internet.
+Never commit `.env` or paste provider secrets into source control.
 
-Farmer sign-in uses Google OAuth. A first-time Google sign-in creates a farmer account after Google returns a verified email; existing accounts are linked by verified email. The farmer then completes farm, crop, soil, and location details in the dashboard. Twilio OTP is not required. Password login and recovery are not part of the farmer-facing sign-in flow. Admin roles are not configured.
+## Google-only farmer authentication
 
-## Farmer map and recommendations
+The farmer-facing sign-in uses Google OAuth. A first-time Google sign-in creates a farmer account after Google returns a verified email. Existing accounts are linked by verified email. After sign-in, the farmer fills in farm, crop, soil, and map-location details in the dashboard. Twilio OTP and phone-based passwords are not required for the sign-in flow.
 
-After login, enter the current crop, soil, season, farm area, weather estimates, and location. The OpenStreetMap picker updates latitude and longitude when the map is clicked or its pin is moved. The browser's location button requires permission; map tiles require an internet connection. Those coordinates and farm inputs are sent to `POST /api/farm/recommendation`. Camera/gallery images and the same farm profile are sent to `POST /api/disease/analyze`.
+In Google Cloud, create an OAuth 2.0 Web application client and add this exact local redirect URI:
 
-## Model limitations
+`http://localhost:8000/auth/google/callback`
 
-The crop recommender can train from a labelled CSV file with N, P, K, temperature, humidity, pH, rainfall, and label columns. Until that real dataset is supplied, its fallback remains an 18-row demo dataset. The image classifier still uses synthetic samples and must not be treated as a disease diagnosis. Neither model is validated for every crop, cultivar, disease, or growing region. Validated disease photos are stored in SQLite and served only to their owning authenticated farmer. Do not use predictions alone to select treatments; field verification and a locally validated dataset/model are needed before production use. No external training dataset is downloaded automatically. Add the licensed crop dataset locally at `backend/data/crop_recommendation.csv`, then run `python backend/scripts/train_crop_model.py` from the repository root. The trainer uses a stratified 80/20 hold-out split, reports validation accuracy, and saves the trained model under `backend/models/`. Do not commit private or restricted datasets. The CSV must contain `N,P,K,temperature,humidity,ph,rainfall,label` columns.
+Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` in the server environment. Production deployments must use HTTPS and the matching production callback URI.
 
-Current conditions and a seven-day forecast are fetched from Open-Meteo using the saved farm coordinates. Place search and reverse geocoding use OpenStreetMap Nominatim; service availability and its usage policy apply. Sentinel-2 NDVI, Agmarknet mandi prices, Twilio OTP, and Google OAuth now have configurable server-side adapters. They remain unavailable until the provider credentials below are supplied. The yield estimate is a low-confidence reference-range calculation, not a trained district-level model. Admin roles and password recovery remain unconfigured.
+## Farmer data and integrations
 
-### Provider configuration\n\nCopy `backend/.env.example` to `backend/.env` and set only the providers you have configured. Install requirements first; Uvicorn loads this file through python-dotenv. Start with `uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload --env-file backend/.env` when you have created that file. Never commit real keys.\n\n- Google Cloud: create an OAuth 2.0 Web client and add the exact callback URL `http://localhost:8000/auth/google/callback` (production must use HTTPS). Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`. Google sign-in creates a new farmer account on the first verified Google login and links an existing account when the verified email matches.\n- Sentinel Hub: create an OAuth client with Process API access and set `SENTINELHUB_CLIENT_ID` and `SENTINELHUB_CLIENT_SECRET`. The satellite endpoint requests a cloud-filtered Sentinel-2 L2A point sample around the saved farm coordinate; it is not a full-field zonal mean.\n- data.gov.in: subscribe to the Agmarknet daily mandi prices resource and set `DATA_GOV_IN_API_KEY`. Resource ID can be overridden with `DATA_GOV_IN_MARKET_RESOURCE_ID`. Prices are reported arrivals, not guaranteed farm-gate offers.\n\nSet `COOKIE_SECURE=true` in HTTPS production. Do not commit `.env` files.\n\nTo run the backend regression tests, install `backend/test-requirements.txt`, then run `pytest backend/tests` from the project root.
+Farmer accounts, farm profiles, image records, and activity history are stored in SQLite. Each authenticated farmer can save farm name, crop and variety, crop stage, land area, season, soil measurements, irrigation details, coordinates, and administrative location fields.
+
+- Weather and forecast: Open-Meteo, using saved farm coordinates.
+- Location search and reverse geocoding: OpenStreetMap Nominatim.
+- Satellite NDVI: Sentinel Hub Sentinel-2 L2A point sample; configure `SENTINELHUB_CLIENT_ID` and `SENTINELHUB_CLIENT_SECRET`.
+- Mandi prices: data.gov.in Agmarknet resource; configure `DATA_GOV_IN_API_KEY` and, if needed, `DATA_GOV_IN_MARKET_RESOURCE_ID`.
+- Yield: low-confidence reference-range estimate, not a trained regional yield model.
+
+External integrations remain unavailable until their provider credentials and subscriptions are configured. The application should not display fabricated live readings.
+
+## Training the crop recommendation model
+
+The repository does not currently include a licensed real-world crop training dataset. The fallback recommender uses 18 hand-entered demo records and must not be represented as a validated agronomic model.
+
+To train with a real labelled dataset:
+
+1. Create `backend/data/`.
+2. Place the licensed CSV at `backend/data/crop_recommendation.csv`.
+3. Ensure it contains these exact columns: `N,P,K,temperature,humidity,ph,rainfall,label`.
+4. From the repository root, run:
+
+```powershell
+.\.venv\Scripts\python.exe backend\scripts\train_crop_model.py
+```
+
+The trainer validates the required columns, requires at least 30 labelled rows and two crop classes, performs a stratified 80/20 hold-out split, reports validation accuracy, and writes the model to `backend/models/crop_recommendation_model.joblib`. The application automatically loads a trained CSV model when it is newer than the saved model file. Missing soil NPK or pH values are imputed from the training data's median.
+
+Do not commit private or restricted datasets or generated model binaries. A validation score on one dataset is not a guarantee of crop suitability in a particular field.
+
+## Disease model limitation
+
+The current disease-image classifier still trains on synthetic image-feature samples. It is a software prototype, not a validated plant-disease diagnosis. A real disease-image dataset (for example, a properly licensed folder of crop/disease-labelled images) is still required before a trustworthy image model can be trained. Farmers should confirm suspected disease and treatment with a local agricultural expert.
+
+## Tests
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest backend/tests -q
+```
+
+The GitHub Actions workflow runs the backend regression tests on pull requests.
