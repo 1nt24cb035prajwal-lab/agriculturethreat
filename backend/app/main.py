@@ -103,7 +103,7 @@ async def integrations_status():
 @app.post("/api/auth/otp/send")
 async def send_registration_otp(payload: dict):
     phone = str(payload.get("mobile") or "").strip()
-    if not re.fullmatch(r"\+?[0-9]{8,15}", phone):
+    if not re.fullmatch(r"\+[0-9]{8,15}", phone):
         raise HTTPException(status_code=400, detail="Enter a phone number in international format, for example +919876543210.")
     try:
         result = await advanced_services.start_phone_verification(phone)
@@ -116,7 +116,7 @@ async def send_registration_otp(payload: dict):
 async def verify_registration_otp(payload: dict):
     phone = str(payload.get("mobile") or "").strip()
     code = str(payload.get("code") or "").strip()
-    if not re.fullmatch(r"\+?[0-9]{8,15}", phone) or not re.fullmatch(r"[0-9]{4,10}", code):
+    if not re.fullmatch(r"\+[0-9]{8,15}", phone) or not re.fullmatch(r"[0-9]{4,10}", code):
         raise HTTPException(status_code=400, detail="Enter the phone number and numeric OTP.")
     try:
         approved = await advanced_services.check_phone_verification(phone, code)
