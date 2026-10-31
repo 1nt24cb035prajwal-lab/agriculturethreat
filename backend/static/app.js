@@ -116,7 +116,7 @@ const renderDashboard = (dashboard, weather = null, water = null) => {
   document.getElementById('settingsSummary').innerHTML = `
     <div><strong>Farmer:</strong> ${escapeHtml(farmer.name)}</div>
     <div><strong>Email:</strong> ${escapeHtml(farmer.email)}</div>
-    <div><strong>Phone:</strong> ${escapeHtml(farmer.mobile)} · ${farmer.phoneVerified ? 'Verified' : 'Not provided'}</div>
+    <div><strong>Phone:</strong> ${escapeHtml(farmer.mobile || 'Not provided')} · ${farmer.phoneVerified ? 'Verified' : 'Not provided'}</div>
     <div><strong>Farm:</strong> ${escapeHtml(farm.farmName || 'Not saved')}</div>
     <div><strong>Location:</strong> ${escapeHtml(location)}</div>
   `;
@@ -287,7 +287,6 @@ const logout = () => {
   dashboardSection.classList.add('hidden');
   adminSection.classList.add('hidden');
   authBox.classList.remove('hidden');
-  showTab('login');
   navigateTo('/login');
 };
 
