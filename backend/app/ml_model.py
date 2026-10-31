@@ -419,7 +419,7 @@ class CropRecommendationModel:
 
         ranked_indices = np.argsort(probabilities)[::-1][:3]
         alternatives = [
-            {"crop": str(model.classes_[int(index)]), "confidencePct": int(float(probabilities[int(index)]) * 100)}
+            {"crop": str(classes[int(index)]), "confidencePct": int(float(probabilities[int(index)]) * 100)}
             for index in ranked_indices
         ]
 
