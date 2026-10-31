@@ -2,6 +2,9 @@ from pathlib import Path
 import json
 import sys
 
+project_root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(project_root))
+
 from backend.app.ml_model import CropRecommendationModel
 
 
