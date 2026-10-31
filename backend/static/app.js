@@ -575,6 +575,10 @@ const refreshWeatherForCoordinates = async (latitude, longitude) => {
   try {
     const weather = await api.get(`/api/weather/preview?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}`);
     renderWeatherForecast(weather);
+    const liveTemperature = cropRecommendationForm.elements.namedItem('temperature');
+    const liveHumidity = cropRecommendationForm.elements.namedItem('humidity');
+    if (liveTemperature && weather.current.temperatureC != null) liveTemperature.value = weather.current.temperatureC;
+    if (liveHumidity && weather.current.humidityPercent != null) liveHumidity.value = weather.current.humidityPercent;
     const weatherCard = [...dashboardCards.querySelectorAll('.stat-card')].find((card) => card.querySelector('h4')?.textContent === 'Weather');
     if (weatherCard) {
       weatherCard.querySelector('.value').textContent = `${weather.current.temperatureC}°C · ${weather.current.condition}`;
