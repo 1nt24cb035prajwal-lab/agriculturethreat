@@ -23,4 +23,4 @@ jobs:
           pip install -r backend/requirements.txt
           pip install -r backend/test-requirements.txt
       - name: Run backend tests
-        run: pytest backend/tests -q
+        run: PYTHONPATH=. pytest backend/tests -q
