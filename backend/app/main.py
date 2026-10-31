@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from PIL import Image
 
 from . import database
+from . import integrations
 from .ml_model import CropRecommendationModel, PlantDiseaseModel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,7 +27,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 @app.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 @app.get("/api/health")
@@ -239,7 +240,54 @@ def integration_unavailable(name: str) -> None:
 
 @app.get("/api/weather")
 async def get_weather(farmer: dict = Depends(require_farmer)):
-    integration_unavailable("Weather")
+    farm = database.get_farm(farmer["id"])
+    latitude = farm.get("latitude")
+    longitude = farm.get("longitude")
+    if latitude is None or longitude is None:
+        raise HTTPException(status_code=400, detail="Save a farm map location before requesting local weather.")
+    try:
+        result = await integrations.fetch_weather(float(latitude), float(longitude))
+    except integrations.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    database.record_activity(farmer["id"], "weather_lookup", {"source": result["source"], "observedAt": result["retrievedAt"]})
+    return result
+
+
+@app.get("/api/weather/preview")
+async def preview_weather(latitude: float, longitude: float, farmer: dict = Depends(require_farmer)):
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        raise HTTPException(status_code=400, detail="Latitude or longitude is outside the valid geographic range.")
+    try:
+        return await integrations.fetch_weather(latitude, longitude)
+    except integrations.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/location/reverse")
+async def reverse_farm_location(payload: dict, farmer: dict = Depends(require_farmer)):
+    try:
+        latitude = float(payload["latitude"])
+        longitude = float(payload["longitude"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Latitude and longitude are required numeric coordinates.") from exc
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        raise HTTPException(status_code=400, detail="Latitude or longitude is outside the valid geographic range.")
+    try:
+        return await integrations.reverse_geocode(latitude, longitude)
+    except integrations.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/location/search")
+async def search_farm_location(q: str, farmer: dict = Depends(require_farmer)):
+    query = q.strip()
+    if len(query) < 3 or len(query) > 160:
+        raise HTTPException(status_code=400, detail="Search location must contain 3 to 160 characters.")
+    try:
+        results = await integrations.search_location(query)
+    except integrations.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"results": results, "source": "OpenStreetMap Nominatim"}
 
 
 @app.get("/api/vegetation")
@@ -254,7 +302,72 @@ async def get_disease(farmer: dict = Depends(require_farmer)):
 
 @app.get("/api/water")
 async def get_water(farmer: dict = Depends(require_farmer)):
-    integration_unavailable("Water sensor data")
+    farm = database.get_farm(farmer["id"])
+    if farm.get("latitude") is None or farm.get("longitude") is None:
+        raise HTTPException(status_code=400, detail="Save a farm map location before calculating water needs.")
+    if not farm.get("cropName") or not farm.get("landArea"):
+        raise HTTPException(status_code=400, detail="Save crop and land area before calculating water needs.")
+    try:
+        weather = await integrations.fetch_weather(float(farm["latitude"]), float(farm["longitude"]))
+    except integrations.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    crop = str(farm["cropName"]).strip().lower()
+    stage = str(farm.get("cropStage") or "").lower()
+    stage_name = "initial" if any(word in stage for word in ("sowing", "seed", "germination", "transplant")) else "late" if any(word in stage for word in ("ripening", "mature", "harvest")) else "mid"
+    crop_coefficients = {
+        "rice": {"initial": 0.3, "mid": 1.2, "late": 0.6},
+        "wheat": {"initial": 0.3, "mid": 1.15, "late": 0.25},
+        "maize": {"initial": 0.3, "mid": 1.2, "late": 0.6},
+        "ragi": {"initial": 0.3, "mid": 1.0, "late": 0.3},
+        "tomato": {"initial": 0.6, "mid": 1.15, "late": 0.8},
+        "potato": {"initial": 0.5, "mid": 1.15, "late": 0.75},
+        "cotton": {"initial": 0.35, "mid": 1.15, "late": 0.7},
+    }
+    coefficients = crop_coefficients.get(crop)
+    crop_coefficient = coefficients[stage_name] if coefficients else 0.85
+    unit = str(farm.get("landAreaUnit") or "Acres").lower()
+    area_sqm = float(farm["landArea"]) * (10_000 if unit.startswith("hect") else 4046.8564224)
+    irrigation_method = str(farm.get("irrigationType") or "").lower()
+    efficiency = 0.9 if "drip" in irrigation_method else 0.75 if "sprinkler" in irrigation_method else 0.6 if "flood" in irrigation_method else 0.65 if "furrow" in irrigation_method else 1.0
+    forecast = weather["forecast"]
+    if not forecast or forecast[0].get("referenceEvapotranspirationMm") is None:
+        raise HTTPException(status_code=503, detail="Reference evapotranspiration is missing from the weather provider response.")
+
+    daily_estimates = []
+    for day in forecast:
+        reference_et = day.get("referenceEvapotranspirationMm")
+        if reference_et is None:
+            continue
+        crop_et_mm = float(reference_et) * crop_coefficient
+        effective_rain_mm = float(day.get("rainfallMm") or 0) * 0.8
+        net_irrigation_mm = max(crop_et_mm - effective_rain_mm, 0)
+        gross_irrigation_liters = net_irrigation_mm * area_sqm / efficiency
+        daily_estimates.append({
+            "date": day["date"],
+            "referenceEvapotranspirationMm": reference_et,
+            "cropEvapotranspirationMm": round(crop_et_mm, 2),
+            "effectiveRainfallMm": round(effective_rain_mm, 2),
+            "estimatedIrrigationLiters": round(gross_irrigation_liters),
+        })
+
+    result = {
+        "source": weather["source"],
+        "sourceUrl": weather["sourceUrl"],
+        "crop": farm["cropName"],
+        "cropStage": farm.get("cropStage") or "Not provided; mid-season coefficient assumed",
+        "landArea": farm["landArea"],
+        "landAreaUnit": farm.get("landAreaUnit") or "Acres",
+        "irrigationMethod": farm.get("irrigationType") or "Not provided; gross application efficiency not adjusted",
+        "cropCoefficient": crop_coefficient,
+        "dailyIrrigationLitersEstimate": daily_estimates[0]["estimatedIrrigationLiters"],
+        "nextSevenDaysLitersEstimate": sum(day["estimatedIrrigationLiters"] for day in daily_estimates),
+        "forecast": daily_estimates,
+        "estimate": True,
+        "notice": "Planning estimate from Open-Meteo FAO reference ET, generic crop coefficients, forecast rainfall, and assumed irrigation efficiency. Soil moisture, local calibration, and sensor readings are not included.",
+    }
+    database.record_activity(farmer["id"], "water_requirement_estimate", {"crop": result["crop"], "dailyLiters": result["dailyIrrigationLitersEstimate"], "source": result["source"]})
+    return result
 
 
 @app.get("/api/fertilizer")
@@ -363,3 +476,14 @@ async def disease_status():
         "classes": list(model.classes_),
         "demoMode": True,
     }
+
+
+@app.get("/{page_name}", response_class=HTMLResponse)
+async def application_page(page_name: str, request: Request):
+    pages = {
+        "login", "register", "dashboard", "farm", "recommendations", "disease",
+        "weather", "satellite", "yield", "threats", "history", "reports", "settings",
+    }
+    if page_name not in pages:
+        raise HTTPException(status_code=404, detail="Page not found.")
+    return templates.TemplateResponse(request, "index.html")

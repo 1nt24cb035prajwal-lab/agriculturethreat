@@ -275,6 +275,161 @@ button, input {
   border-radius: 22px;
 }
 
+.auth-section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(380px, 1.1fr);
+  gap: 32px;
+  align-items: center;
+}
+
+.auth-intro {
+  padding: 28px;
+  color: #f7fff8;
+  background: linear-gradient(145deg, #153f2d, #2f7048);
+  border-radius: 20px;
+}
+
+.auth-intro .eyebrow,
+.auth-intro h1 {
+  color: #f7fff8;
+}
+
+.auth-intro h1 {
+  margin: 12px 0;
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.auth-intro p,
+.auth-intro li {
+  line-height: 1.65;
+}
+
+.auth-intro ul {
+  padding-left: 20px;
+}
+
+.farmer-navigation {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px;
+  margin: 22px 0;
+  background: #e9f4eb;
+  border: 1px solid rgba(21, 63, 45, 0.1);
+  border-radius: 12px;
+}
+
+.farmer-navigation a {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  color: #214b35;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.farmer-navigation a.active,
+.farmer-navigation a:hover {
+  color: #fff;
+  background: #235d3b;
+}
+
+.page-title {
+  margin: 8px 0 0;
+  color: #4a6856;
+  font-size: 1.15rem;
+}
+
+body[data-page="home"] .auth-section,
+body[data-page="home"] .dashboard-section,
+body[data-page="home"] .admin-section {
+  display: none;
+}
+
+body[data-page="login"] main > section:not(.auth-section),
+body[data-page="register"] main > section:not(.auth-section) {
+  display: none;
+}
+
+body:not([data-page="home"]):not([data-page="login"]):not([data-page="register"]) main > section:not(#dashboardSection),
+body:not([data-page="home"]):not([data-page="login"]):not([data-page="register"]) .footer {
+  display: none;
+}
+
+body[data-page="login"] .topbar .nav-links,
+body[data-page="login"] .topbar .nav-action,
+body[data-page="register"] .topbar .nav-links,
+body[data-page="register"] .topbar .nav-action,
+body:not([data-page="home"]):not([data-page="login"]):not([data-page="register"]) .topbar .nav-links,
+body:not([data-page="home"]):not([data-page="login"]):not([data-page="register"]) .topbar .nav-action,
+body[data-page="login"] .footer,
+body[data-page="register"] .footer {
+  display: none;
+}
+
+body[data-page="login"] .auth-section,
+body[data-page="register"] .auth-section {
+  min-height: calc(100vh - 150px);
+}
+
+body[data-page="dashboard"] [data-feature-view],
+body[data-page="farm"] [data-feature-view],
+body[data-page="recommendations"] [data-feature-view],
+body[data-page="disease"] [data-feature-view],
+body[data-page="weather"] [data-feature-view],
+body[data-page="satellite"] [data-feature-view],
+body[data-page="yield"] [data-feature-view],
+body[data-page="threats"] [data-feature-view],
+body[data-page="history"] [data-feature-view],
+body[data-page="reports"] [data-feature-view],
+body[data-page="settings"] [data-feature-view] {
+  display: none;
+}
+
+body[data-page="dashboard"] [data-feature-view~="dashboard"],
+body[data-page="dashboard"] [data-feature-view~="weather"],
+body[data-page="dashboard"] [data-feature-view~="satellite"],
+body[data-page="dashboard"] [data-feature-view~="yield"],
+body[data-page="dashboard"] [data-feature-view~="threats"],
+body[data-page="farm"] [data-feature-view~="farm"],
+body[data-page="recommendations"] [data-feature-view~="recommendations"],
+body[data-page="disease"] [data-feature-view~="disease"],
+body[data-page="weather"] [data-feature-view~="weather"],
+body[data-page="satellite"] [data-feature-view~="satellite"],
+body[data-page="yield"] [data-feature-view~="yield"],
+body[data-page="threats"] [data-feature-view~="threats"],
+body[data-page="history"] [data-feature-view~="history"],
+body[data-page="reports"] [data-feature-view~="reports"],
+body[data-page="settings"] [data-feature-view~="settings"] {
+  display: block;
+}
+
+body[data-page="dashboard"] .dashboard-grid {
+  display: grid;
+}
+
+body:not([data-page="dashboard"]) .dashboard-grid {
+  display: none;
+}
+
+body[data-page="dashboard"] .two-col-layout,
+body[data-page="weather"] .two-col-layout,
+body[data-page="satellite"] .two-col-layout,
+body[data-page="yield"] .two-col-layout,
+body[data-page="threats"] .two-col-layout {
+  display: grid;
+}
+
+body[data-page="farm"] .two-col-layout,
+body[data-page="recommendations"] .two-col-layout,
+body[data-page="disease"] .two-col-layout,
+body[data-page="history"] .two-col-layout,
+body[data-page="reports"] .two-col-layout,
+body[data-page="settings"] .two-col-layout {
+  display: none;
+}
+
 .text-panel {
   padding: 28px;
   line-height: 1.8;
@@ -639,6 +794,25 @@ input {
   z-index: 0;
 }
 
+.location-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.location-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.data-source {
+  display: block;
+  color: #53685b;
+  margin-top: 8px;
+}
+
 .map-status {
   margin: -8px 0 0;
   color: #4c685d;
@@ -744,6 +918,19 @@ input {
 
   .page-shell {
     padding-inline: 12px;
+  }
+
+  .auth-section {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .auth-box {
+    padding: 16px;
+  }
+
+  .location-tools {
+    grid-template-columns: 1fr;
   }
 
   .hero h1 {

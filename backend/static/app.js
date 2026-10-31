@@ -25,12 +25,15 @@ const latitudeInput = cropRecommendationForm.querySelector('[name="latitude"]');
 const longitudeInput = cropRecommendationForm.querySelector('[name="longitude"]');
 let farmMap;
 let farmMarker;
+let weatherPreviewTimer;
+let dashboardData;
 
 const api = {
   get: async (path) => {
     const response = await fetch(path);
     if (!response.ok) {
-      throw new Error('Request failed');
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Request failed');
     }
     return response.json();
   },
@@ -87,7 +90,7 @@ const showTab = (tabName) => {
   registerForm.classList.toggle('active', tabName === 'register');
 };
 
-const renderDashboard = (dashboard) => {
+const renderDashboard = (dashboard, weather = null, water = null) => {
   const { farmer, farm, integrations } = dashboard;
   welcomeMessage.textContent = dashboard.welcome;
   farmerProfileSummary.textContent = `${farmer.email} · ${farm.farmName || 'Farm details not yet saved'}`;
@@ -97,7 +100,8 @@ const renderDashboard = (dashboard) => {
     { title: 'Farm area', value: farm.landArea ? `${farm.landArea} ${farm.landAreaUnit || 'acres'}` : 'Not set', detail: 'Saved farm profile', tone: 'blue' },
     { title: 'Farm location', value: location, detail: farm.latitude == null ? 'Choose a map location' : `${farm.latitude}, ${farm.longitude}`, tone: 'teal' },
     { title: 'Soil type', value: farm.soilType || 'Not set', detail: 'Farmer supplied', tone: 'green' },
-    { title: 'Weather', value: integrations.weather === 'not_configured' ? 'Not connected' : 'Unavailable', detail: 'No live weather provider', tone: 'amber' },
+    { title: 'Weather', value: weather ? `${weather.current.temperatureC}°C · ${weather.current.condition}` : 'Unavailable', detail: weather ? `${weather.current.humidityPercent}% humidity · ${weather.current.rainfallMm} mm rain` : 'Live weather unavailable', tone: 'amber' },
+    { title: 'Water requirement', value: water ? `${water.dailyIrrigationLitersEstimate} L/day est.` : 'Unavailable', detail: water ? `${water.nextSevenDaysLitersEstimate} L / 7-day estimate` : 'Needs crop, area, and live ET0', tone: 'teal' },
     { title: 'Satellite / NDVI', value: 'Not connected', detail: 'No satellite provider', tone: 'blue' },
     { title: 'Market prices', value: 'Not connected', detail: 'No market data provider', tone: 'purple' },
     { title: 'Live threat alerts', value: 'Unavailable', detail: 'No verified live threat feed', tone: 'red' }
@@ -110,7 +114,7 @@ const renderDashboard = (dashboard) => {
     </div>
   `).join('');
 
-  weatherForecast.innerHTML = '<p class="empty-state">A weather provider has not been configured. No forecast is available.</p>';
+  renderWeatherForecast(weather);
   vegetationMap.innerHTML = '<p class="empty-state">Satellite imagery and NDVI are not connected. No vegetation measurement is available.</p>';
   growthChart.innerHTML = '<p class="empty-state">Yield history will appear after real or farmer-recorded yield data is saved.</p>';
   threatList.innerHTML = '<p class="empty-state">No live threat feed is connected. This page will not invent risk alerts.</p>';
@@ -118,8 +122,29 @@ const renderDashboard = (dashboard) => {
     <div><strong>Farm:</strong> ${escapeHtml(farm.farmName || 'Not saved')}</div>
     <div><strong>Crop:</strong> ${escapeHtml(farm.cropName || 'Not set')}</div>
     <div><strong>Location:</strong> ${escapeHtml(location)}</div>
-    <div><strong>Water, yield, and fertilizer:</strong> No validated local data is connected. Use the crop recommendation as a clearly labeled prototype estimate only.</div>
+    <div id="waterEstimateDetails"><strong>Water requirement:</strong> ${water ? `${escapeHtml(water.dailyIrrigationLitersEstimate)} L/day · ${escapeHtml(water.nextSevenDaysLitersEstimate)} L over 7 days` : 'Save crop, area, and map coordinates for an estimate.'}</div>
+    ${water ? `<small>${escapeHtml(water.notice)}</small>` : ''}
+    <div><strong>Yield and soil-test fertilizer:</strong> No validated regional yield or soil-test data is connected.</div>
   `;
+  document.getElementById('settingsSummary').innerHTML = `
+    <div><strong>Farmer:</strong> ${escapeHtml(farmer.name)}</div>
+    <div><strong>Email:</strong> ${escapeHtml(farmer.email)}</div>
+    <div><strong>Phone:</strong> ${escapeHtml(farmer.mobile)} · ${farmer.phoneVerified ? 'Verified' : 'Not verified'}</div>
+    <div><strong>Farm:</strong> ${escapeHtml(farm.farmName || 'Not saved')}</div>
+    <div><strong>Location:</strong> ${escapeHtml(location)}</div>
+  `;
+};
+
+const renderWeatherForecast = (weather) => {
+  weatherForecast.innerHTML = weather?.forecast?.length
+    ? weather.forecast.map((day) => `
+      <div class="forecast-item">
+        <span>${escapeHtml(day.date)}</span>
+        <strong>${escapeHtml(day.condition)} · ${escapeHtml(day.temperatureMinC)}–${escapeHtml(day.temperatureMaxC)}°C</strong>
+        <span>${escapeHtml(day.rainProbabilityPercent ?? '—')}% rain</span>
+      </div>
+    `).join('') + `<small class="data-source">Source: ${escapeHtml(weather.source)} · Updated ${escapeHtml(weather.retrievedAt)}</small>`
+    : '<p class="empty-state">No live forecast is available for this saved farm location.</p>';
 };
 
 const renderAdminStats = (adminData) => {
@@ -147,6 +172,7 @@ const showDashboard = async () => {
       api.get('/api/activity')
     ]);
 
+    dashboardData = dashboard;
     renderDashboard(dashboard);
     fillFarmForm(dashboard.farm || {});
     renderActivity(history.items);
@@ -154,9 +180,85 @@ const showDashboard = async () => {
     adminSection.classList.add('hidden');
     authBox.classList.add('hidden');
     window.setTimeout(() => farmMap?.invalidateSize(), 60);
+    const hasSavedCoordinates = dashboard.farm.latitude !== null && dashboard.farm.longitude !== null;
+    const hasWaterInputs = Boolean(dashboard.farm.cropName && dashboard.farm.landArea);
+    if (hasSavedCoordinates && hasWaterInputs) {
+      refreshDashboardFeeds(dashboard);
+    }
   } catch (error) {
     alert('Unable to load dashboard data in demo mode.');
   }
+};
+
+const refreshDashboardFeeds = async (dashboard) => {
+  const [weatherResult, waterResult] = await Promise.allSettled([api.get('/api/weather'), api.get('/api/water')]);
+  if (dashboardData?.farmer?.id !== dashboard.farmer.id || dashboardSection.classList.contains('hidden')) {
+    return;
+  }
+  renderDashboard(
+    dashboard,
+    weatherResult.status === 'fulfilled' ? weatherResult.value : null,
+    waterResult.status === 'fulfilled' ? waterResult.value : null
+  );
+};
+
+const routeTitles = {
+  dashboard: ['Farmer dashboard', 'Dashboard'],
+  farm: ['Farm records', 'Crop and Land Information'],
+  recommendations: ['Decision support', 'Crop Recommendation'],
+  disease: ['Image review', 'Disease Detection'],
+  weather: ['Open-Meteo', 'Weather Monitoring'],
+  satellite: ['Provider unavailable', 'Satellite Vegetation'],
+  yield: ['History only', 'Crop Yield'],
+  threats: ['Provider unavailable', 'Threat Information'],
+  history: ['Your account records', 'Activity History'],
+  reports: ['Export saved records', 'Reports'],
+  settings: ['Farmer account', 'Settings']
+};
+
+const navigateTo = (path, replace = false) => {
+  if (replace) {
+    window.history.replaceState({}, '', path);
+  } else {
+    window.history.pushState({}, '', path);
+  }
+  renderCurrentPage();
+};
+
+const renderCurrentPage = async () => {
+  const requestedPage = window.location.pathname.replace(/^\/+|\/+$/g, '') || 'home';
+  const publicPages = new Set(['home', 'login', 'register']);
+  const page = routeTitles[requestedPage] || publicPages.has(requestedPage) ? requestedPage : 'home';
+  document.body.dataset.page = page;
+  adminSection.classList.add('hidden');
+
+  if (page === 'home' || page === 'login' || page === 'register') {
+    dashboardSection.classList.add('hidden');
+    authBox.classList.remove('hidden');
+    showTab(page === 'register' ? 'register' : 'login');
+    document.title = page === 'home' ? 'Agriculture Threat Fusion' : `${page === 'login' ? 'Farmer Login' : 'Farmer Registration'} | Agriculture Threat Fusion`;
+    return;
+  }
+
+  try {
+    await api.get('/api/me');
+  } catch (error) {
+    navigateTo('/login', true);
+    return;
+  }
+
+  document.title = `${routeTitles[page][1]} | Agriculture Threat Fusion`;
+  await showDashboard();
+  const [eyebrow, title] = routeTitles[page];
+  document.getElementById('pageEyebrow').textContent = eyebrow;
+  document.getElementById('pageTitle').textContent = title;
+  document.getElementById('farmPanelTitle').textContent = page === 'recommendations' ? 'Location and Crop Suitability Inputs' : 'Crop and Land Information';
+  document.getElementById('historyPanelTitle').textContent = page === 'reports' ? 'Saved Activity Report' : 'Activity History';
+  document.querySelectorAll('.farmer-navigation a').forEach((link) => {
+    link.classList.toggle('active', link.pathname === `/${page}`);
+  });
+  document.querySelector('[data-feature-view~="settings"]').classList.toggle('hidden', page !== 'settings');
+  document.getElementById('downloadReportButton').classList.toggle('hidden', page !== 'reports');
 };
 
 const login = async (event) => {
@@ -169,7 +271,7 @@ const login = async (event) => {
 
   try {
     await api.post('/api/auth/login', payload);
-    showDashboard();
+    navigateTo('/dashboard');
   } catch (error) {
     alert(error.message || 'Invalid credentials');
   }
@@ -199,6 +301,7 @@ const register = async (event) => {
     document.querySelector('#loginForm [name="identifier"]').value = payload.mobile;
     alert(`${result.message} Sign in with your phone or email and password.`);
     showTab('login');
+    navigateTo('/login');
   } catch (error) {
     alert(error.message || 'Unable to register');
   }
@@ -221,6 +324,7 @@ const logout = () => {
   adminSection.classList.add('hidden');
   authBox.classList.remove('hidden');
   showTab('login');
+  navigateTo('/login');
 };
 
 const fillFarmForm = (farm) => {
@@ -287,7 +391,20 @@ const farmerFormPayload = () => {
 
 const saveFarmProfile = async () => {
   const result = await api.put('/api/farm/profile', farmerFormPayload());
-  farmerProfileSummary.textContent = `${result.farm.farmName} · ${result.farm.village}, ${result.farm.district}, ${result.farm.state}`;
+  let weather = null;
+  let water = null;
+  try {
+    weather = await api.get('/api/weather');
+  } catch (error) {
+    weather = null;
+  }
+  try {
+    water = await api.get('/api/water');
+  } catch (error) {
+    water = null;
+  }
+  renderDashboard(await api.get('/api/dashboard'), weather, water);
+  fillFarmForm(result.farm);
   const history = await api.get('/api/activity');
   renderActivity(history.items);
   return result;
@@ -406,6 +523,26 @@ const setFarmCoordinates = (latitude, longitude, source) => {
     farmMap.setView(position, 11);
   }
   mapStatus.textContent = `${source}: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+  if (source !== 'Saved farm location') {
+    window.clearTimeout(weatherPreviewTimer);
+    weatherPreviewTimer = window.setTimeout(() => refreshWeatherForCoordinates(latitude, longitude), 500);
+  }
+};
+
+const refreshWeatherForCoordinates = async (latitude, longitude) => {
+  mapStatus.textContent = `Loading weather for ${latitude.toFixed(4)}, ${longitude.toFixed(4)}...`;
+  try {
+    const weather = await api.get(`/api/weather/preview?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}`);
+    renderWeatherForecast(weather);
+    const weatherCard = [...dashboardCards.querySelectorAll('.stat-card')].find((card) => card.querySelector('h4')?.textContent === 'Weather');
+    if (weatherCard) {
+      weatherCard.querySelector('.value').textContent = `${weather.current.temperatureC}°C · ${weather.current.condition}`;
+      weatherCard.querySelector('.detail').textContent = `${weather.current.humidityPercent}% humidity · ${weather.current.rainfallMm} mm rain · ${weather.source}`;
+    }
+    mapStatus.textContent = `Weather loaded from ${weather.source}; save the farm profile to keep this location.`;
+  } catch (error) {
+    mapStatus.textContent = error.message || 'Weather is unavailable for this selected location.';
+  }
 };
 
 const initializeFarmMap = () => {
@@ -461,6 +598,54 @@ document.getElementById('locateFarmButton').addEventListener('click', () => {
     { enableHighAccuracy: true, timeout: 10000 }
   );
 });
+
+document.getElementById('searchLocationButton').addEventListener('click', async () => {
+  const query = document.getElementById('locationSearchInput').value.trim();
+  if (query.length < 3) {
+    mapStatus.textContent = 'Enter at least 3 characters to search for a place.';
+    return;
+  }
+  mapStatus.textContent = 'Searching OpenStreetMap locations...';
+  try {
+    const response = await api.get(`/api/location/search?q=${encodeURIComponent(query)}`);
+    if (!response.results.length) {
+      mapStatus.textContent = 'No matching places found. Move the map or enter coordinates manually.';
+      return;
+    }
+    const place = response.results[0];
+    setFarmCoordinates(place.latitude, place.longitude, 'Place search');
+    applyPlaceDetails(place);
+  } catch (error) {
+    mapStatus.textContent = error.message || 'Place search is unavailable.';
+  }
+});
+
+document.getElementById('lookupLocationButton').addEventListener('click', async () => {
+  if (!latitudeInput.value || !longitudeInput.value) {
+    mapStatus.textContent = 'Select the farm point on the map or use device location first.';
+    return;
+  }
+  mapStatus.textContent = 'Identifying selected place...';
+  try {
+    const place = await api.post('/api/location/reverse', {
+      latitude: Number(latitudeInput.value),
+      longitude: Number(longitudeInput.value)
+    });
+    applyPlaceDetails(place);
+    mapStatus.textContent = `${place.displayName} · OpenStreetMap`;
+  } catch (error) {
+    mapStatus.textContent = error.message || 'Place identification is unavailable.';
+  }
+});
+
+const applyPlaceDetails = (place) => {
+  for (const [field, value] of Object.entries({ village: place.village, district: place.district, state: place.state })) {
+    if (value) {
+      cropRecommendationForm.elements.namedItem(field).value = value;
+    }
+  }
+};
+
 document.getElementById('saveFarmButton').addEventListener('click', async () => {
   try {
     const result = await saveFarmProfile();
@@ -477,7 +662,7 @@ const ctaSecondary = document.getElementById('ctaSecondary');
 const logoutButton = document.getElementById('logoutButton');
 const forgotPassword = document.getElementById('forgotPassword');
 
-authTabs.forEach((tab) => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+authTabs.forEach((tab) => tab.addEventListener('click', () => navigateTo(tab.dataset.tab === 'register' ? '/register' : '/login')));
 loginForm.addEventListener('submit', login);
 registerForm.addEventListener('submit', register);
 forgotPassword.addEventListener('click', resetPassword);
@@ -485,6 +670,7 @@ logoutButton.addEventListener('click', logout);
 diseaseForm.addEventListener('submit', analyzeDisease);
 cropRecommendationForm.addEventListener('submit', generateRecommendation);
 initializeFarmMap();
+window.addEventListener('popstate', renderCurrentPage);
 
 diseaseImageInput.addEventListener('change', () => {
   const image = diseaseImageInput.files[0];
@@ -506,14 +692,27 @@ document.getElementById('removeDiseaseImage').addEventListener('click', () => {
   diseaseImageInput.dispatchEvent(new Event('change'));
 });
 
-[primaryAction, primarySecondary, loginButton, ctaSecondary].forEach((button) => {
-  button.addEventListener('click', () => {
-    dashboardSection.classList.add('hidden');
-    adminSection.classList.add('hidden');
-    authBox.classList.remove('hidden');
-    showTab('login');
-    window.scrollTo({ top: document.querySelector('.auth-section').offsetTop - 30, behavior: 'smooth' });
-  });
+for (const button of [primaryAction, primarySecondary]) {
+  button.addEventListener('click', () => navigateTo('/register'));
+}
+for (const button of [loginButton, ctaSecondary]) {
+  button.addEventListener('click', () => navigateTo('/login'));
+}
+
+document.getElementById('downloadReportButton').addEventListener('click', async () => {
+  try {
+    const report = await api.get('/api/reports');
+    const rows = [['date', 'type', 'details'], ...report.items.map((item) => [new Date(item.createdAt * 1000).toISOString(), item.type, JSON.stringify(item.details)])];
+    const csv = rows.map((row) => row.map((field) => `"${String(field).replaceAll('"', '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = 'agriculture-activity-report.csv';
+    downloadLink.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    alert(error.message || 'Unable to export activity report.');
+  }
 });
 
-showTab('login');
+renderCurrentPage();

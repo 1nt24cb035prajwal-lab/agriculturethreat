@@ -53,8 +53,8 @@
           <div class="hero-visual">
             <div class="visual-card weather-card">
               <div class="card-header"><span>Weather integration</span><span>⛅</span></div>
-              <div class="big-temp">Not connected</div>
-              <div class="weather-meta">Live conditions appear after a weather provider is configured.</div>
+              <div class="big-temp">Farm-based</div>
+              <div class="weather-meta">Current weather and a seven-day forecast load from Open-Meteo after you save farm coordinates.</div>
             </div>
             <div class="crop-glow"></div>
           </div>
@@ -89,7 +89,7 @@
           </div>
           <div class="feature-grid">
             <article class="feature-card"><span>🩺</span><h3>Crop Image Review</h3><p>Upload or capture an image for a synthetic-data prototype classification. Confirm results with an agricultural expert.</p></article>
-            <article class="feature-card"><span>⛅</span><h3>Weather Monitoring</h3><p>Weather data is not connected yet. The dashboard identifies this instead of displaying invented forecasts.</p></article>
+            <article class="feature-card"><span>⛅</span><h3>Weather Monitoring</h3><p>Current conditions and a seven-day forecast use Open-Meteo for the saved farm coordinates.</p></article>
             <article class="feature-card"><span>🛰️</span><h3>Satellite Vegetation</h3><p>Satellite imagery and NDVI are unavailable until a provider is configured.</p></article>
             <article class="feature-card"><span>💧</span><h3>Water Planning</h3><p>Save irrigation and soil details with the farm profile; validated sensor and evapotranspiration data are not connected.</p></article>
             <article class="feature-card"><span>🌱</span><h3>Soil and Crop Records</h3><p>Store crop, season, irrigation, water source, and optional soil test measurements per farmer.</p></article>
@@ -112,6 +112,17 @@
         </section>
 
         <section class="auth-section">
+          <div class="auth-intro">
+            <p class="eyebrow">Agriculture Threat Fusion</p>
+            <h1>Welcome Back, Farmer!</h1>
+            <p>Keep farm records, locations, and activity together. Weather and map details use configured public providers; model suggestions are prototypes.</p>
+            <ul>
+              <li>Private farm profile and activity</li>
+              <li>Map-selected location and live weather</li>
+              <li>Crop image review with prototype AI</li>
+              <li>Transparent provider and data status</li>
+            </ul>
+          </div>
           <div class="auth-box" id="authBox">
             <div class="auth-tabs">
               <button class="tab active" data-tab="login">Farmer Login</button>
@@ -150,11 +161,25 @@
         </section>
 
         <section class="dashboard-section hidden" id="dashboardSection">
-          <div class="data-notice" role="status">Your farm details and activity are saved to your account. Weather, satellite, market-price, SMS, and Google sign-in providers are not connected, so live readings are not shown.</div>
+          <nav class="farmer-navigation" aria-label="Farmer pages">
+            <a href="/dashboard" data-route-link>Dashboard</a>
+            <a href="/farm" data-route-link>Crop and Land</a>
+            <a href="/recommendations" data-route-link>Crop Recommendation</a>
+            <a href="/disease" data-route-link>Disease Detection</a>
+            <a href="/weather" data-route-link>Weather</a>
+            <a href="/satellite" data-route-link>Satellite</a>
+            <a href="/yield" data-route-link>Yield</a>
+            <a href="/threats" data-route-link>Threats</a>
+            <a href="/history" data-route-link>Activity</a>
+            <a href="/reports" data-route-link>Reports</a>
+            <a href="/settings" data-route-link>Settings</a>
+          </nav>
+          <div class="data-notice" role="status">Farm details and activity are saved to your account. Local weather and map place lookup use Open-Meteo and OpenStreetMap; satellite, market prices, SMS, and Google sign-in are not connected.</div>
           <div class="dashboard-header">
             <div>
-              <p class="eyebrow">Farmer dashboard</p>
+              <p class="eyebrow" id="pageEyebrow">Farmer dashboard</p>
               <h2 id="welcomeMessage">Welcome</h2>
+              <h3 id="pageTitle" class="page-title">Dashboard</h3>
               <p id="farmerProfileSummary" class="profile-summary"></p>
             </div>
             <button class="secondary-btn" id="logoutButton">Logout</button>
@@ -163,34 +188,34 @@
           <div class="dashboard-grid" id="dashboardCards"></div>
 
           <div class="two-col-layout">
-            <div class="panel">
+            <div class="panel" data-feature-view="weather">
               <div class="panel-title">Weather Forecast</div>
               <div id="weatherForecast" class="forecast-list"></div>
             </div>
-            <div class="panel">
+            <div class="panel" data-feature-view="satellite">
               <div class="panel-title">Vegetation Status</div>
               <div id="vegetationMap" class="vegetation-map"></div>
             </div>
           </div>
 
           <div class="two-col-layout">
-            <div class="panel">
+            <div class="panel" data-feature-view="yield">
               <div class="panel-title">Crop Growth & Yield</div>
               <div id="growthChart" class="bar-chart"></div>
             </div>
-            <div class="panel">
+            <div class="panel" data-feature-view="threats">
               <div class="panel-title">Threat Alerts</div>
               <div id="threatList" class="list-stack"></div>
             </div>
           </div>
 
-          <div class="panel wide-panel">
+          <div class="panel wide-panel" data-feature-view="dashboard">
             <div class="panel-title">AI and Farm Recommendations</div>
             <div id="recommendationSummary" class="recommendation-box"></div>
           </div>
 
-          <div class="panel wide-panel">
-            <div class="panel-title">Farm Location & Crop Recommendation</div>
+          <div class="panel wide-panel" data-feature-view="farm recommendations">
+            <div class="panel-title" id="farmPanelTitle">Crop and Land Information</div>
             <form id="cropRecommendationForm" class="recommendation-form">
               <div class="two-col">
                 <label>Farm Name<input type="text" name="farmName" required /></label>
@@ -253,6 +278,13 @@
                 <span>Farm coordinates</span>
                 <button class="secondary-btn" id="locateFarmButton" type="button">Use my location</button>
               </div>
+              <div class="location-tools">
+                <label>Search location<input type="search" id="locationSearchInput" placeholder="Village, district, or town" /></label>
+                <div class="location-actions">
+                  <button class="secondary-btn" id="searchLocationButton" type="button">Search map</button>
+                  <button class="secondary-btn" id="lookupLocationButton" type="button">Identify selected place</button>
+                </div>
+              </div>
               <div id="farmMap" aria-label="Farm location map"></div>
               <p id="mapStatus" class="map-status">No farm location saved. Click the map, move the pin, or allow device location to set coordinates.</p>
               <button class="secondary-btn" id="saveFarmButton" type="button">Save Farm Details</button>
@@ -261,7 +293,7 @@
             <div id="recommendationResult" class="disease-result">Add your farm location and crop to generate a location-aware recommendation.</div>
           </div>
 
-          <div class="panel wide-panel">
+          <div class="panel wide-panel" data-feature-view="disease">
             <div class="panel-title">Crop Disease Camera Detection</div>
             <form id="diseaseForm" class="disease-form">
               <input type="file" id="diseaseImage" name="file" accept="image/*" capture="environment" />
@@ -273,9 +305,15 @@
             <div id="diseaseResult" class="disease-result">Upload a crop photo to run AI disease detection.</div>
             <a class="secondary-btn supplier-link" href="https://share.google/tCbEJZtVxZKIURC8C" target="_blank" rel="noopener noreferrer">Find Fertilizer Suppliers</a>
           </div>
-          <div class="panel wide-panel">
-            <div class="panel-title">Activity History</div>
+          <div class="panel wide-panel" data-feature-view="history reports">
+            <div class="panel-title" id="historyPanelTitle">Activity History</div>
+            <button class="secondary-btn" id="downloadReportButton" type="button">Download Activity CSV</button>
             <div id="activityHistory" class="list-stack"><p>No saved activity yet.</p></div>
+          </div>
+          <div class="panel wide-panel hidden" data-feature-view="settings">
+            <div class="panel-title">Farmer Account and Integrations</div>
+            <div id="settingsSummary" class="recommendation-box"></div>
+            <p class="empty-state">Phone change verification, password recovery, SMS, and Google sign-in need configured identity providers.</p>
           </div>
         </section>
 
