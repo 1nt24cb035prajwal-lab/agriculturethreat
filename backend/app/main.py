@@ -34,7 +34,7 @@ async def landing_page(request: Request):
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "service": "Agriculture Threat Fusion", "database": "sqlite", "demoMode": True}
+    return {"status": "ok", "service": "Agriculture Threat Fusion", "database": "sqlite", "integrations": advanced_services.configured_status()}
 
 
 def require_farmer(request: Request) -> dict:
@@ -70,15 +70,21 @@ async def register_farmer(payload: dict):
         "latitude": None,
         "longitude": None,
     }
-    if advanced_services.configured_status()["smsOtp"] == "configured" and not database.consume_phone_verification(mobile):
-        raise HTTPException(status_code=400, detail="Verify this phone number with the OTP before creating your account.")
+    phone_verified = False
+    if advanced_services.configured_status()["smsOtp"] == "configured":
+        phone_verified = database.consume_phone_verification(mobile)
+        if not phone_verified:
+            raise HTTPException(status_code=400, detail="Verify this phone number with the OTP before creating your account.")
 
     try:
         farmer = database.create_farmer(full_name, mobile, email, password, farm_profile)
+        if phone_verified:
+            database.set_farmer_phone_verified(int(farmer["id"].removeprefix("F-")))
+            farmer["phoneVerified"] = True
     except sqlite3.IntegrityError as exc:
         raise HTTPException(status_code=409, detail="That mobile number or email is already registered.") from exc
     return {
-        "message": "Account created. Phone verification is not active because no SMS provider is configured.",
+        "message": "Account created. Phone verification status is shown on your profile.",
         "farmer": farmer,
         "phoneVerified": False,
         "integrations": {"smsOtp": advanced_services.configured_status()["smsOtp"]},
