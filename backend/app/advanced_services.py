@@ -110,14 +110,23 @@ async def fetch_sentinel_ndvi(latitude: float, longitude: float) -> dict[str, An
             payload = response.json()
     except (httpx.HTTPError, KeyError, ValueError) as exc:
         raise ProviderUnavailable("Sentinel Hub did not return a usable NDVI sample. Check subscription, quota, and imagery availability.") from exc
-    sample = payload.get("data", [{}])[0].get("bands", {}).get("B0", {}).get("stats", {})
-    # Sentinel Hub JSON responses vary by evalscript; parse common sample shape without inventing a value.
-    values = payload.get("default") or payload.get("data") or []
+    # JSON output may expose band statistics or direct sample arrays depending on the Sentinel Hub response.
+    data_items = payload.get("data") or []
     ndvi = None
-    if isinstance(values, list) and values and isinstance(values[0], (int, float)):
-        ndvi = float(values[0])
-    elif isinstance(payload.get("data"), dict):
-        ndvi = payload["data"].get("ndvi")
+    if isinstance(data_items, list) and data_items:
+        bands = data_items[0].get("bands", {}) if isinstance(data_items[0], dict) else {}
+        band_zero = bands.get("B0", {}) if isinstance(bands, dict) else {}
+        stats = band_zero.get("stats", {}) if isinstance(band_zero, dict) else {}
+        if isinstance(stats.get("mean"), (int, float)):
+            ndvi = float(stats["mean"])
+        elif isinstance(band_zero.get("sample"), (int, float)):
+            ndvi = float(band_zero["sample"])
+    if ndvi is None:
+        values = payload.get("default") or payload.get("data") or []
+        if isinstance(values, list) and values and isinstance(values[0], (int, float)):
+            ndvi = float(values[0])
+        elif isinstance(payload.get("data"), dict):
+            ndvi = payload["data"].get("ndvi")
     if ndvi is None:
         raise ProviderUnavailable("Sentinel Hub response contained no NDVI sample for this farm point.")
     return {"ndvi": round(ndvi, 3), "source": "Sentinel Hub Sentinel-2 L2A", "retrievedAt": date.today().isoformat(), "windowDays": 45, "cloudCoverageMaxPercent": 35, "coordinates": {"latitude": latitude, "longitude": longitude}, "notice": "Single farm-point sample; cloud filtering and a 45-day search window apply. Not a whole-field average."}
