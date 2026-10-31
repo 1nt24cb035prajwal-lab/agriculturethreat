@@ -3,16 +3,18 @@ from io import BytesIO
 import os
 import re
 import sqlite3
-from urllib.parse import quote
+import secrets
+from urllib.parse import quote, urlencode
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image
 
 from . import database
 from . import integrations
+from . import advanced_services
 from .ml_model import CropRecommendationModel, PlantDiseaseModel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -68,6 +70,9 @@ async def register_farmer(payload: dict):
         "latitude": None,
         "longitude": None,
     }
+    if advanced_services.configured_status()["smsOtp"] == "configured" and not database.consume_phone_verification(mobile):
+        raise HTTPException(status_code=400, detail="Verify this phone number with the OTP before creating your account.")
+
     try:
         farmer = database.create_farmer(full_name, mobile, email, password, farm_profile)
     except sqlite3.IntegrityError as exc:
@@ -76,8 +81,75 @@ async def register_farmer(payload: dict):
         "message": "Account created. Phone verification is not active because no SMS provider is configured.",
         "farmer": farmer,
         "phoneVerified": False,
-        "integrations": {"smsOtp": "not_configured"},
+        "integrations": {"smsOtp": advanced_services.configured_status()["smsOtp"]},
     }
+
+
+@app.get("/api/integrations/status")
+async def integrations_status():
+    return advanced_services.configured_status()
+
+
+@app.post("/api/auth/otp/send")
+async def send_registration_otp(payload: dict):
+    phone = str(payload.get("mobile") or "").strip()
+    if not re.fullmatch(r"\+?[0-9]{8,15}", phone):
+        raise HTTPException(status_code=400, detail="Enter a phone number in international format, for example +919876543210.")
+    try:
+        result = await advanced_services.start_phone_verification(phone)
+    except advanced_services.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"message": "Verification code sent.", "verification": result}
+
+
+@app.post("/api/auth/otp/verify")
+async def verify_registration_otp(payload: dict):
+    phone = str(payload.get("mobile") or "").strip()
+    code = str(payload.get("code") or "").strip()
+    if not re.fullmatch(r"\+?[0-9]{8,15}", phone) or not re.fullmatch(r"[0-9]{4,10}", code):
+        raise HTTPException(status_code=400, detail="Enter the phone number and numeric OTP.")
+    try:
+        approved = await advanced_services.check_phone_verification(phone, code)
+    except advanced_services.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not approved:
+        raise HTTPException(status_code=400, detail="The OTP is invalid or expired.")
+    database.mark_phone_verified(phone)
+    return {"message": "Phone number verified. Complete registration using this number.", "verified": True}
+
+
+@app.get("/auth/google/start")
+async def google_oauth_start(request: Request):
+    status = advanced_services.configured_status()["googleOAuth"]
+    if status != "configured":
+        raise HTTPException(status_code=503, detail="Google OAuth is not configured. Add Google OAuth client credentials.")
+    state = secrets.token_urlsafe(32)
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI") or str(request.url_for("google_oauth_callback"))
+    params = {"client_id": os.environ["GOOGLE_CLIENT_ID"], "redirect_uri": redirect_uri, "response_type": "code", "scope": "openid email profile", "state": state, "prompt": "select_account"}
+    response = RedirectResponse("https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params))
+    response.set_cookie("google_oauth_state", state, max_age=600, httponly=True, secure=os.getenv("COOKIE_SECURE", "false").lower() == "true", samesite="lax")
+    return response
+
+
+@app.get("/auth/google/callback", name="google_oauth_callback")
+async def google_oauth_callback(request: Request, code: str | None = None, state: str | None = None):
+    expected_state = request.cookies.get("google_oauth_state")
+    if not code or not state or not expected_state or not secrets.compare_digest(state, expected_state):
+        raise HTTPException(status_code=400, detail="Google sign-in state check failed. Please try again.")
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI") or str(request.url_for("google_oauth_callback"))
+    try:
+        profile = await advanced_services.exchange_google_code(code, redirect_uri)
+    except advanced_services.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    account = database.get_farmer_by_login(str(profile["email"]).lower())
+    if not account:
+        raise HTTPException(status_code=404, detail="No farmer account uses this Google email yet. Register with this email first, then sign in with Google.")
+    token = database.create_session(account["id"])
+    response = RedirectResponse("/dashboard", status_code=303)
+    response.set_cookie("farmer_session", token, max_age=database.SESSION_TTL_SECONDS, httponly=True, secure=os.getenv("COOKIE_SECURE", "false").lower() == "true", samesite="lax", path="/")
+    response.delete_cookie("google_oauth_state")
+    database.record_activity(database.farmer_public(account)["id"], "google_login", {"email": profile["email"]})
+    return response
 
 
 @app.post("/api/auth/login")
@@ -225,11 +297,12 @@ async def get_dashboard(farmer: dict = Depends(require_farmer)):
         "farmer": farmer,
         "farm": farm,
         "integrations": {
-            "weather": "not_configured",
-            "satellite": "not_configured",
-            "marketPrices": "not_configured",
-            "nearbyMarkets": "not_configured",
-            "smsAlerts": "not_configured",
+            "weather": "configured",
+            "satellite": advanced_services.configured_status()["sentinelHub"],
+            "marketPrices": advanced_services.configured_status()["marketPrices"],
+            "nearbyMarkets": advanced_services.configured_status()["marketPrices"],
+            "smsAlerts": advanced_services.configured_status()["smsOtp"],
+            "googleOAuth": advanced_services.configured_status()["googleOAuth"],
         },
     }
 
@@ -292,7 +365,15 @@ async def search_farm_location(q: str, farmer: dict = Depends(require_farmer)):
 
 @app.get("/api/vegetation")
 async def get_vegetation(farmer: dict = Depends(require_farmer)):
-    integration_unavailable("Satellite vegetation")
+    farm = database.get_farm(farmer["id"])
+    if farm.get("latitude") is None or farm.get("longitude") is None:
+        raise HTTPException(status_code=400, detail="Save farm coordinates before requesting satellite NDVI.")
+    try:
+        result = await advanced_services.fetch_sentinel_ndvi(float(farm["latitude"]), float(farm["longitude"]))
+    except advanced_services.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    database.record_activity(farmer["id"], "satellite_ndvi", {"ndvi": result["ndvi"], "source": result["source"]})
+    return result
 
 
 @app.get("/api/disease")
@@ -377,7 +458,29 @@ async def get_fertilizer(farmer: dict = Depends(require_farmer)):
 
 @app.get("/api/yield")
 async def get_yield(farmer: dict = Depends(require_farmer)):
-    integration_unavailable("Regional yield data")
+    farm = database.get_farm(farmer["id"])
+    try:
+        result = advanced_services.estimate_yield(farm)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    database.record_activity(farmer["id"], "yield_estimate", {"crop": result["crop"], "expectedEstimateTonnes": result["expectedEstimateTonnes"], "method": result["method"]})
+    return result
+
+
+@app.get("/api/markets")
+async def get_market_prices(commodity: str | None = None, farmer: dict = Depends(require_farmer)):
+    farm = database.get_farm(farmer["id"])
+    state = str(farm.get("state") or "").strip()
+    district = str(farm.get("district") or "").strip()
+    crop = str(commodity or farm.get("cropName") or "").strip()
+    if not state or not district or not crop:
+        raise HTTPException(status_code=400, detail="Save farm state, district, and crop before checking mandi prices.")
+    try:
+        result = await advanced_services.fetch_market_prices(state, district, crop)
+    except advanced_services.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    database.record_activity(farmer["id"], "market_price_lookup", {"commodity": crop, "records": len(result["records"]), "source": result["source"]})
+    return result
 
 
 @app.get("/api/threats")
