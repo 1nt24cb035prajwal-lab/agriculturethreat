@@ -151,9 +151,29 @@ async def google_oauth_callback(request: Request, code: str | None = None, state
         profile = await advanced_services.exchange_google_code(code, redirect_uri)
     except advanced_services.ProviderUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    account = database.get_farmer_by_login(str(profile["email"]).lower())
+    google_sub = str(profile.get("sub") or "").strip()
+    email = str(profile.get("email") or "").strip().lower()
+    if not google_sub or not email:
+        raise HTTPException(status_code=400, detail="Google did not return a complete verified account identity.")
+
+    account = database.get_farmer_by_google_sub(google_sub)
     if not account:
-        raise HTTPException(status_code=404, detail="No farmer account uses this Google email yet. Register with this email first, then sign in with Google.")
+        account = database.get_farmer_by_login(email)
+        if account:
+            try:
+                database.link_google_account(int(account["id"]), google_sub)
+                account = database.get_farmer_by_login(email)
+            except sqlite3.IntegrityError as exc:
+                raise HTTPException(status_code=409, detail="This Google account is already linked to another farmer.") from exc
+        else:
+            try:
+                database.create_google_farmer(str(profile.get("name") or "Farmer"), email, google_sub)
+                account = database.get_farmer_by_login(email)
+            except sqlite3.IntegrityError as exc:
+                raise HTTPException(status_code=409, detail="A farmer account already exists for this Google email. Please sign in again.") from exc
+
+    if not account:
+        raise HTTPException(status_code=500, detail="Unable to create or load the Google farmer account.")
     token = database.create_session(account["id"])
     response = RedirectResponse("/dashboard", status_code=303)
     response.set_cookie("farmer_session", token, max_age=database.SESSION_TTL_SECONDS, httponly=True, secure=os.getenv("COOKIE_SECURE", "false").lower() == "true", samesite="lax", path="/")
