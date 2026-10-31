@@ -296,7 +296,11 @@
           <div class="panel wide-panel" data-feature-view="disease">
             <div class="panel-title">Crop Disease Camera Detection</div>
             <form id="diseaseForm" class="disease-form">
-              <input type="file" id="diseaseImage" name="file" accept="image/*" capture="environment" />
+              <div class="two-col">
+                <label>Crop<input type="text" id="diseaseCropName" name="cropName" list="cropOptions" placeholder="Use saved crop or enter crop name" /></label>
+                <label>Growth Stage<select id="diseaseCropStage" name="cropStage"><option value="">Select growth stage</option><option value="Germination">Germination</option><option value="Seedling">Seedling</option><option value="Vegetative">Vegetative</option><option value="Flowering">Flowering</option><option value="Fruiting / Grain filling">Fruiting / Grain filling</option><option value="Maturity">Maturity</option><option value="Harvest">Harvest</option></select></label>
+              </div>
+              <label>Crop photo<input type="file" id="diseaseImage" name="file" accept="image/jpeg,image/png,image/webp" capture="environment" required /></label>
               <img id="diseasePreview" class="disease-preview hidden" alt="Preview of selected crop image" />
               <button class="secondary-btn hidden" id="removeDiseaseImage" type="button">Remove image</button>
               <p class="map-status">Image analysis will use the crop and farm location above.</p>
