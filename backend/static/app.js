@@ -517,7 +517,7 @@ const generateRecommendation = async (event) => {
       throw new Error(result.detail || 'Recommendation failed.');
     }
 
-    const { crop, requestedCrop, suitability, confidencePct, locationZone, reason, irrigationAdvice, fertilizerAdvice, risk, yieldExpectation, datasetNotice } = result.recommendation;
+    const { crop, requestedCrop, suitability, confidencePct, locationZone, reason, irrigationAdvice, fertilizerAdvice, risk, yieldExpectation, datasetNotice, alternatives = [] } = result.recommendation;
     recommendationResult.innerHTML = `
       <strong>Crop entered:</strong> ${escapeHtml(requestedCrop)}<br>
       <strong>Model suggestion:</strong> ${escapeHtml(crop)} (${escapeHtml(suitability)})<br>
@@ -529,6 +529,7 @@ const generateRecommendation = async (event) => {
       <strong>Fertilizer:</strong> ${escapeHtml(fertilizerAdvice)}<br>
       <strong>Risk:</strong> ${escapeHtml(risk)}<br>
       <strong>Yield expectation:</strong> ${escapeHtml(yieldExpectation)}<br>
+      <strong>Other suitable model candidates:</strong> ${alternatives.map(item => `${escapeHtml(item.crop)} (${escapeHtml(item.confidencePct)}%)`).join(', ')}<br>
       <small>${escapeHtml(datasetNotice)}</small>
     `;
 
