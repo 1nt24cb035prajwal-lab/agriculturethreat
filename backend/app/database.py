@@ -65,6 +65,10 @@ def initialize_database() -> None:
                 image_data BLOB NOT NULL,
                 created_at INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS verified_phones (
+                phone TEXT PRIMARY KEY,
+                verified_until INTEGER NOT NULL
+            );
             """
         )
         farmer_columns = {row["name"] for row in connection.execute("PRAGMA table_info(farmers)")}
@@ -222,6 +226,30 @@ def get_disease_image(farmer_id: str, image_id: str) -> dict[str, Any] | None:
     if not row:
         return None
     return {"filename": row["filename"], "mediaType": row["media_type"], "imageData": row["image_data"]}
+
+
+def mark_phone_verified(phone: str, ttl_seconds: int = 900) -> None:
+    with connect() as connection:
+        connection.execute(
+            "INSERT INTO verified_phones (phone, verified_until) VALUES (?, ?) "
+            "ON CONFLICT(phone) DO UPDATE SET verified_until = excluded.verified_until",
+            (phone, int(time.time()) + ttl_seconds),
+        )
+
+
+def consume_phone_verification(phone: str) -> bool:
+    now = int(time.time())
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT verified_until FROM verified_phones WHERE phone = ?", (phone,)
+        ).fetchone()
+        connection.execute("DELETE FROM verified_phones WHERE phone = ?", (phone,))
+    return bool(row and row["verified_until"] >= now)
+
+
+def set_farmer_phone_verified(farmer_id: int) -> None:
+    with connect() as connection:
+        connection.execute("UPDATE farmers SET phone_verified = 1 WHERE id = ?", (farmer_id,))
 
 
 initialize_database()
