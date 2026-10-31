@@ -180,7 +180,7 @@
             <a href="/reports" data-route-link>Reports</a>
             <a href="/settings" data-route-link>Settings</a>
           </nav>
-          <div class="data-notice" role="status">Farm details and activity are saved to your account. Local weather and map place lookup use Open-Meteo and OpenStreetMap; satellite, market prices, SMS, and Google sign-in are not connected.</div>
+          <div class="data-notice" role="status">Farm records are private to your account. Weather uses Open-Meteo; Sentinel-2, mandi prices, OTP and Google sign-in become live when their server credentials are configured.</div>
           <div class="dashboard-header">
             <div>
               <p class="eyebrow" id="pageEyebrow">Farmer dashboard</p>
@@ -332,7 +332,7 @@
           <div class="panel wide-panel hidden" data-feature-view="settings">
             <div class="panel-title">Farmer Account and Integrations</div>
             <div id="settingsSummary" class="recommendation-box"></div>
-            <p class="empty-state">Phone change verification, password recovery, SMS, and Google sign-in need configured identity providers.</p>
+            <p class="empty-state">Phone OTP and Google sign-in require Twilio Verify and Google OAuth credentials. Password recovery and admin roles are not yet implemented.</p>
           </div>
         </section>
 
