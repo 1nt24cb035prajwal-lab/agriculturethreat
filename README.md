@@ -1,3 +1,5 @@
+# agriculturethreat
+
 # Agriculture Threat Fusion
 
 A demo-ready full-stack agriculture monitoring prototype built to match the requested workflow: farmer registration, weather monitoring, disease prediction, water recommendations, fertilizer insights, yield forecasting, and agricultural threat detection.
