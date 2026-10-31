@@ -91,6 +91,11 @@ def test_disease_analysis_accepts_crop_and_location_metadata():
     assert payload["result"]["cropName"] == "Tomato"
     assert payload["result"]["location"]["district"] == "Coimbatore"
     assert payload["result"]["location"]["village"] == "Hunsur"
+    image_id = payload["result"]["imageId"]
+    saved_image = client.get(f"/api/disease/history/{image_id}/image")
+    assert saved_image.status_code == 200
+    assert saved_image.headers["content-type"] == "image/png"
+    assert TestClient(app).get(f"/api/disease/history/{image_id}/image").status_code == 401
     assert client.get("/api/activity").json()["items"][0]["type"] == "disease_detection"
 
 

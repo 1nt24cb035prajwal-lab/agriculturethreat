@@ -607,6 +607,15 @@ input {
   line-height: 1.7;
 }
 
+.empty-state {
+  margin: 0;
+  padding: 14px;
+  border-left: 3px solid #79917f;
+  background: #f3f7f3;
+  color: #43584a;
+  line-height: 1.6;
+}
+
 .recommendation-form {
   display: grid;
   gap: 18px;

@@ -57,6 +57,14 @@ def initialize_database() -> None:
             );
             CREATE INDEX IF NOT EXISTS activity_farmer_created_idx
                 ON activity(farmer_id, created_at DESC);
+            CREATE TABLE IF NOT EXISTS disease_images (
+                id TEXT PRIMARY KEY,
+                farmer_id INTEGER NOT NULL REFERENCES farmers(id) ON DELETE CASCADE,
+                filename TEXT NOT NULL,
+                media_type TEXT NOT NULL,
+                image_data BLOB NOT NULL,
+                created_at INTEGER NOT NULL
+            );
             """
         )
         farmer_columns = {row["name"] for row in connection.execute("PRAGMA table_info(farmers)")}
@@ -190,6 +198,30 @@ def get_activity(farmer_id: str, limit: int = 100) -> list[dict[str, Any]]:
         {"id": row["id"], "type": row["activity_type"], "details": json.loads(row["details_json"]), "createdAt": row["created_at"]}
         for row in rows
     ]
+
+
+def store_disease_image(farmer_id: str, filename: str, media_type: str, image_data: bytes) -> str:
+    numeric_id = int(farmer_id.removeprefix("F-"))
+    image_id = secrets.token_urlsafe(18)
+    with connect() as connection:
+        connection.execute(
+            "INSERT INTO disease_images (id, farmer_id, filename, media_type, image_data, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (image_id, numeric_id, Path(filename).name[:255], media_type, image_data, int(time.time())),
+        )
+    return image_id
+
+
+def get_disease_image(farmer_id: str, image_id: str) -> dict[str, Any] | None:
+    numeric_id = int(farmer_id.removeprefix("F-"))
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT filename, media_type, image_data FROM disease_images WHERE id = ? AND farmer_id = ?",
+            (image_id, numeric_id),
+        ).fetchone()
+    if not row:
+        return None
+    return {"filename": row["filename"], "mediaType": row["media_type"], "imageData": row["image_data"]}
 
 
 initialize_database()

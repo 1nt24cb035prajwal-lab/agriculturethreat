@@ -87,54 +87,38 @@ const showTab = (tabName) => {
   registerForm.classList.toggle('active', tabName === 'register');
 };
 
-const renderDashboard = (dashboard, weather, vegetation, threats, fertilizer, yieldData, water) => {
+const renderDashboard = (dashboard) => {
+  const { farmer, farm, integrations } = dashboard;
   welcomeMessage.textContent = dashboard.welcome;
-
-  dashboardCards.innerHTML = dashboard.cards.map((card) => `
+  farmerProfileSummary.textContent = `${farmer.email} · ${farm.farmName || 'Farm details not yet saved'}`;
+  const location = [farm.village, farm.district, farm.state].filter(Boolean).join(', ') || 'Not set';
+  const cards = [
+    { title: 'Current crop', value: farm.cropName || 'Not set', detail: 'Saved farmer input', tone: 'green' },
+    { title: 'Farm area', value: farm.landArea ? `${farm.landArea} ${farm.landAreaUnit || 'acres'}` : 'Not set', detail: 'Saved farm profile', tone: 'blue' },
+    { title: 'Farm location', value: location, detail: farm.latitude == null ? 'Choose a map location' : `${farm.latitude}, ${farm.longitude}`, tone: 'teal' },
+    { title: 'Soil type', value: farm.soilType || 'Not set', detail: 'Farmer supplied', tone: 'green' },
+    { title: 'Weather', value: integrations.weather === 'not_configured' ? 'Not connected' : 'Unavailable', detail: 'No live weather provider', tone: 'amber' },
+    { title: 'Satellite / NDVI', value: 'Not connected', detail: 'No satellite provider', tone: 'blue' },
+    { title: 'Market prices', value: 'Not connected', detail: 'No market data provider', tone: 'purple' },
+    { title: 'Live threat alerts', value: 'Unavailable', detail: 'No verified live threat feed', tone: 'red' }
+  ];
+  dashboardCards.innerHTML = cards.map((card) => `
     <div class="stat-card ${toneClassMap[card.tone] || 'green'}">
-      <h4>${card.title}</h4>
-      <div class="value">${card.value}</div>
-      <div class="detail">${card.detail}</div>
+      <h4>${escapeHtml(card.title)}</h4>
+      <div class="value">${escapeHtml(card.value)}</div>
+      <div class="detail">${escapeHtml(card.detail)}</div>
     </div>
   `).join('');
 
-  weatherForecast.innerHTML = weather.forecast.map((day) => `
-    <div class="forecast-item">
-      <span>${day.day}</span>
-      <strong>${day.icon} ${day.temp}°C</strong>
-      <span>${day.rain} mm</span>
-    </div>
-  `).join('');
-
-  vegetationMap.innerHTML = vegetation.map.map((zone) => `
-    <div class="veg-item">
-      <span>${zone.zone}</span>
-      <span>${zone.value.toFixed(2)}</span>
-      <span class="badge">${zone.label}</span>
-    </div>
-  `).join('');
-
-  const growthBars = [52, 64, 77, 84, 92, 88, 94];
-  growthChart.innerHTML = growthBars.map((value, index) => `
-    <div class="bar-col">
-      <div class="bar" style="height: ${value}%"></div>
-      <div class="bar-label">${['Jun','Jul','Aug','Sep','Oct','Nov','Dec'][index]}</div>
-    </div>
-  `).join('');
-
-  threatList.innerHTML = threats.threats.map((item) => `
-    <div class="list-item">
-      <strong>${item.name}</strong>
-      <p><b>Risk:</b> ${item.risk} · <b>Crop:</b> ${item.crop}</p>
-      <p>${item.evidence}</p>
-    </div>
-  `).join('');
-
+  weatherForecast.innerHTML = '<p class="empty-state">A weather provider has not been configured. No forecast is available.</p>';
+  vegetationMap.innerHTML = '<p class="empty-state">Satellite imagery and NDVI are not connected. No vegetation measurement is available.</p>';
+  growthChart.innerHTML = '<p class="empty-state">Yield history will appear after real or farmer-recorded yield data is saved.</p>';
+  threatList.innerHTML = '<p class="empty-state">No live threat feed is connected. This page will not invent risk alerts.</p>';
   recommendationSummary.innerHTML = `
-    <div><strong>Weather:</strong> ${weather.analysis[0]}</div>
-    <div><strong>Water:</strong> ${water.recommendation}</div>
-    <div><strong>Fertilizer:</strong> ${fertilizer.recommendations[0].name} • ${fertilizer.recommendations[0].purpose}</div>
-    <div><strong>Yield:</strong> Expected production is ${yieldData.expectedYieldPerAcre} per acre with a ${yieldData.performance.toLowerCase()} performance outlook.</div>
+    <div><strong>Farm:</strong> ${escapeHtml(farm.farmName || 'Not saved')}</div>
+    <div><strong>Crop:</strong> ${escapeHtml(farm.cropName || 'Not set')}</div>
+    <div><strong>Location:</strong> ${escapeHtml(location)}</div>
+    <div><strong>Water, yield, and fertilizer:</strong> No validated local data is connected. Use the crop recommendation as a clearly labeled prototype estimate only.</div>
   `;
 };
 
@@ -158,22 +142,13 @@ const renderAdminStats = (adminData) => {
 
 const showDashboard = async () => {
   try {
-    const [dashboard, weather, vegetation, threats, fertilizer, yieldData, water, profile, history] = await Promise.all([
+    const [dashboard, history] = await Promise.all([
       api.get('/api/dashboard'),
-      api.get('/api/weather'),
-      api.get('/api/vegetation'),
-      api.get('/api/threats'),
-      api.get('/api/fertilizer'),
-      api.get('/api/yield'),
-      api.get('/api/water'),
-      api.get('/api/me'),
       api.get('/api/activity')
     ]);
 
-    renderDashboard(dashboard, weather, vegetation, threats, fertilizer, yieldData, water);
-    welcomeMessage.textContent = `Welcome, ${profile.farmer.name}`;
-    farmerProfileSummary.textContent = `${profile.farmer.email} · ${profile.farm?.farmName || 'Farm details not yet saved'}`;
-    fillFarmForm(profile.farm || {});
+    renderDashboard(dashboard);
+    fillFarmForm(dashboard.farm || {});
     renderActivity(history.items);
     dashboardSection.classList.remove('hidden');
     adminSection.classList.add('hidden');
@@ -270,6 +245,7 @@ const renderActivity = (items) => {
     <div class="list-item">
       <strong>${escapeHtml(item.type.replaceAll('_', ' '))}</strong>
       <p>${escapeHtml(JSON.stringify(item.details))}</p>
+      ${item.details.imageId ? `<img class="activity-image" src="/api/disease/history/${encodeURIComponent(item.details.imageId)}/image" alt="Saved crop disease image" loading="lazy">` : ''}
       <small>${new Date(item.createdAt * 1000).toLocaleString()}</small>
     </div>
   `).join('');
@@ -283,9 +259,24 @@ const farmerFormPayload = () => {
     state: data.get('state'),
     district: data.get('district'),
     village: data.get('village'),
+    cropVariety: data.get('cropVariety'),
+    cropStage: data.get('cropStage'),
+    farmingMethod: data.get('farmingMethod'),
+    previousCrop: data.get('previousCrop'),
+    cultivationStart: data.get('cultivationStart'),
+    expectedHarvest: data.get('expectedHarvest'),
     soilType: data.get('soilType'),
+    irrigationType: data.get('irrigationType'),
+    waterSource: data.get('waterSource'),
     season: data.get('season'),
     landArea: Number(data.get('landArea')),
+    landAreaUnit: data.get('landAreaUnit'),
+    soilPh: data.get('soilPh') ? Number(data.get('soilPh')) : null,
+    nitrogen: data.get('nitrogen') ? Number(data.get('nitrogen')) : null,
+    phosphorus: data.get('phosphorus') ? Number(data.get('phosphorus')) : null,
+    potassium: data.get('potassium') ? Number(data.get('potassium')) : null,
+    soilMoisture: data.get('soilMoisture') ? Number(data.get('soilMoisture')) : null,
+    organicCarbon: data.get('organicCarbon') ? Number(data.get('organicCarbon')) : null,
     rainfall: Number(data.get('rainfall')),
     humidity: Number(data.get('humidity')),
     temperature: Number(data.get('temperature')),
@@ -345,6 +336,7 @@ const analyzeDisease = async (event) => {
       <strong>Prevention:</strong> ${escapeHtml(prevention)}<br>
       <small>${escapeHtml(warning)}</small>
     `;
+    renderActivity((await api.get('/api/activity')).items);
   } catch (error) {
     diseaseResult.textContent = error.message || 'Unable to analyze the uploaded crop image.';
   }

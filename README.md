@@ -18,7 +18,7 @@ A demo-ready full-stack agriculture monitoring prototype built to match the requ
 - `backend/` - FastAPI server and static frontend assets
 - `frontend/` - React/Vite scaffold aligned with the requested stack
 
-The API currently serves dashboard sample fixtures and prototype ML outputs. These values are explicitly labeled in the UI and are not live measurements.
+The authenticated dashboard reads each farmer's saved farm profile and activity. External feeds that are not configured are displayed as unavailable; they are not returned as plausible-looking sample measurements. Crop and image models remain prototype ML outputs.
 
 ## Accounts and persistence
 
@@ -32,8 +32,8 @@ After login, enter the current crop, soil, season, farm area, weather estimates,
 
 ## Model limitations
 
-The built-in crop recommender is a prototype trained on 18 in-code records across nine crop categories. The image classifier is also trained on synthetic samples. Neither model is a verified agricultural diagnostic or covers every crop, cultivar, disease, or growing region. Disease history stores prediction metadata but does not yet retain uploaded image files. Do not use predictions alone to select treatments; field verification and a locally validated dataset/model are needed before production use. No Google or other external dataset is downloaded automatically.
+The built-in crop recommender is a prototype trained on 18 in-code records across nine crop categories. The image classifier is also trained on synthetic samples. Neither model is a verified agricultural diagnostic or covers every crop, cultivar, disease, or growing region. Validated disease photos are stored in SQLite and served only to their owning authenticated farmer. Do not use predictions alone to select treatments; field verification and a locally validated dataset/model are needed before production use. No Google or other external dataset is downloaded automatically.
 
-Weather forecasts, satellite/NDVI, market prices, nearby markets, SMS/email alerts, and OAuth are integration placeholders; dashboard fixtures are marked as sample data. Connect a licensed/provider API with server-side credentials before representing those values as current. OpenStreetMap tiles and Leaflet are used for the interactive location picker; exact village/taluk reverse geocoding is not yet configured.
+Weather forecasts, satellite/NDVI, market prices, nearby markets, SMS/email alerts, OAuth, and admin roles are not configured. Their API routes do not provide fake current readings. Connect a licensed/provider API with server-side credentials before representing those values as current. OpenStreetMap tiles and Leaflet are used for the interactive location picker; exact village/taluk reverse geocoding is not yet configured.
 
 To run the backend regression tests, install `backend/test-requirements.txt`, then run `pytest backend/tests` from the project root.

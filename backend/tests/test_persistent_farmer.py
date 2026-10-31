@@ -38,7 +38,13 @@ def test_farmer_account_and_farm_profile_persist_with_private_activity():
             "latitude": 12.3,
             "longitude": 76.6,
             "landArea": 3.5,
+            "landAreaUnit": "Hectares",
             "soilType": "Red Soil",
+            "cropVariety": "GPU 28",
+            "irrigationType": "Drip Irrigation",
+            "waterSource": "Borewell",
+            "soilPh": 6.4,
+            "organicCarbon": 0.8,
         },
     )
     assert saved.status_code == 200, saved.text
@@ -48,6 +54,9 @@ def test_farmer_account_and_farm_profile_persist_with_private_activity():
     assert profile.status_code == 200
     assert profile.json()["farmer"]["name"] == "Test Farmer"
     assert profile.json()["farm"]["farmName"] == "Rainfield Farm"
+    assert profile.json()["farm"]["cropVariety"] == "GPU 28"
+    assert profile.json()["farm"]["landAreaUnit"] == "Hectares"
+    assert profile.json()["farm"]["soilPh"] == 6.4
 
     history = client.get("/api/activity")
     assert history.status_code == 200
@@ -55,8 +64,36 @@ def test_farmer_account_and_farm_profile_persist_with_private_activity():
 
 
 def test_farmer_private_endpoints_require_login():
-    response = TestClient(app).get("/api/activity")
-    assert response.status_code == 401
+    client = TestClient(app)
+    assert client.get("/api/activity").status_code == 401
+    assert client.get("/api/dashboard").status_code == 401
+    assert client.get("/api/weather").status_code == 401
+
+
+def test_dashboard_is_farmer_scoped_and_unconfigured_feeds_are_not_fabricated():
+    client = TestClient(app)
+    mobile = f"+1666{uuid4().int % 10_000_000:07d}"
+    client.post(
+        "/api/auth/register",
+        json={
+            "fullName": "Dashboard Farmer",
+            "mobile": mobile,
+            "email": f"{uuid4().hex}@example.test",
+            "password": "CorrectHorseBattery!9",
+            "termsAccepted": True,
+        },
+    )
+    assert client.post("/api/auth/login", json={"identifier": mobile, "password": "CorrectHorseBattery!9"}).status_code == 200
+
+    dashboard = client.get("/api/dashboard")
+    assert dashboard.status_code == 200
+    payload = dashboard.json()
+    assert payload["farmer"]["name"] == "Dashboard Farmer"
+    assert payload["integrations"]["weather"] == "not_configured"
+
+    weather = client.get("/api/weather")
+    assert weather.status_code == 503
+    assert "not configured" in weather.json()["detail"]
 
 
 def test_registration_rejects_duplicate_account_and_weak_password():

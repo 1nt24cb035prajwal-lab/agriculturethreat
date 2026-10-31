@@ -1,7 +1,9 @@
 from pathlib import Path
+from io import BytesIO
 import os
 import re
 import sqlite3
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import HTMLResponse
@@ -9,7 +11,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image
 
-from .data import DEMO_STATE
 from . import database
 from .ml_model import CropRecommendationModel, PlantDiseaseModel
 
@@ -136,7 +137,7 @@ async def save_farmer_profile(payload: dict, farmer: dict = Depends(require_farm
             "farmName", "cropName", "cropVariety", "cropStage", "farmingMethod", "previousCrop",
             "cultivationStart", "expectedHarvest", "state", "district", "taluk", "village",
             "soilType", "irrigationType", "waterSource", "season", "landAreaUnit", "rainfall",
-            "humidity", "temperature", "soilPh", "nitrogen", "phosphorus", "potassium", "soilMoisture",
+            "humidity", "temperature", "soilPh", "nitrogen", "phosphorus", "potassium", "soilMoisture", "organicCarbon",
         )
     }
     profile["latitude"] = latitude
@@ -216,43 +217,59 @@ async def reset_password(payload: dict):
 
 
 @app.get("/api/dashboard")
-async def get_dashboard():
-    return DEMO_STATE["dashboard"]
+async def get_dashboard(farmer: dict = Depends(require_farmer)):
+    farm = database.get_farm(farmer["id"])
+    return {
+        "welcome": f"Welcome, {farmer['name']}",
+        "farmer": farmer,
+        "farm": farm,
+        "integrations": {
+            "weather": "not_configured",
+            "satellite": "not_configured",
+            "marketPrices": "not_configured",
+            "nearbyMarkets": "not_configured",
+            "smsAlerts": "not_configured",
+        },
+    }
+
+
+def integration_unavailable(name: str) -> None:
+    raise HTTPException(status_code=503, detail=f"{name} data is unavailable because its provider integration is not configured.")
 
 
 @app.get("/api/weather")
-async def get_weather():
-    return DEMO_STATE["weather"]
+async def get_weather(farmer: dict = Depends(require_farmer)):
+    integration_unavailable("Weather")
 
 
 @app.get("/api/vegetation")
-async def get_vegetation():
-    return DEMO_STATE["vegetation"]
+async def get_vegetation(farmer: dict = Depends(require_farmer)):
+    integration_unavailable("Satellite vegetation")
 
 
 @app.get("/api/disease")
-async def get_disease():
-    return DEMO_STATE["disease"]
+async def get_disease(farmer: dict = Depends(require_farmer)):
+    integration_unavailable("Disease history")
 
 
 @app.get("/api/water")
-async def get_water():
-    return DEMO_STATE["water"]
+async def get_water(farmer: dict = Depends(require_farmer)):
+    integration_unavailable("Water sensor data")
 
 
 @app.get("/api/fertilizer")
-async def get_fertilizer():
-    return DEMO_STATE["fertilizer"]
+async def get_fertilizer(farmer: dict = Depends(require_farmer)):
+    integration_unavailable("Soil-test fertilizer data")
 
 
 @app.get("/api/yield")
-async def get_yield():
-    return DEMO_STATE["yield"]
+async def get_yield(farmer: dict = Depends(require_farmer)):
+    integration_unavailable("Regional yield data")
 
 
 @app.get("/api/threats")
-async def get_threats():
-    return {"threats": DEMO_STATE["threats"], "notifications": DEMO_STATE["notifications"]}
+async def get_threats(farmer: dict = Depends(require_farmer)):
+    integration_unavailable("Live threat analysis")
 
 
 @app.get("/api/admin")
@@ -261,8 +278,8 @@ async def get_admin_details():
 
 
 @app.get("/api/reports")
-async def get_reports():
-    return DEMO_STATE["reports"]
+async def get_reports(farmer: dict = Depends(require_farmer)):
+    return {"items": database.get_activity(farmer["id"]), "pdfExport": "not_configured"}
 
 
 @app.post("/api/disease/analyze")
@@ -280,9 +297,17 @@ async def analyze_disease(
         raise HTTPException(status_code=400, detail="No file uploaded.")
 
     try:
-        image = Image.open(file.file).convert("RGB")
-        if image.width < 16 or image.height < 16:
+        image_data = await file.read()
+        if not image_data or len(image_data) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Crop images must be non-empty and no larger than 10 MB.")
+        source_image = Image.open(BytesIO(image_data))
+        if source_image.format not in {"JPEG", "PNG", "WEBP"}:
+            raise HTTPException(status_code=400, detail="Upload a JPEG, PNG, or WebP crop image.")
+        if source_image.width < 16 or source_image.height < 16:
             raise HTTPException(status_code=400, detail="Please upload a clear crop image at least 16 × 16 pixels.")
+        if source_image.width * source_image.height > 20_000_000:
+            raise HTTPException(status_code=400, detail="Crop image dimensions are too large to analyze.")
+        image = source_image.convert("RGB")
         result = MODEL_ENGINE.predict(image)
         farm = database.get_farm(farmer["id"])
         result["cropName"] = cropName or farm.get("cropName") or "General crop"
@@ -295,10 +320,17 @@ async def analyze_disease(
                 "longitude": float(longitude) if longitude is not None else farm.get("longitude"),
             },
         }
+        image_id = database.store_disease_image(
+            farmer["id"],
+            file.filename,
+            {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}[source_image.format],
+            image_data,
+        )
+        result["imageId"] = image_id
         database.record_activity(
             farmer["id"],
             "disease_detection",
-            {"filename": file.filename, "cropName": result["cropName"], "predictedDisease": result["predictedDisease"], "confidencePct": result["confidencePct"]},
+            {"imageId": image_id, "filename": file.filename, "cropName": result["cropName"], "predictedDisease": result["predictedDisease"], "confidencePct": result["confidencePct"]},
         )
         return {
             "message": "Disease analysis completed.",
@@ -309,6 +341,18 @@ async def analyze_disease(
         raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Unable to process crop image: {str(exc)}") from exc
+
+
+@app.get("/api/disease/history/{image_id}/image")
+async def get_disease_history_image(image_id: str, farmer: dict = Depends(require_farmer)):
+    stored_image = database.get_disease_image(farmer["id"], image_id)
+    if not stored_image:
+        raise HTTPException(status_code=404, detail="Disease image was not found in your account.")
+    return Response(
+        content=stored_image["imageData"],
+        media_type=stored_image["mediaType"],
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(stored_image['filename'], safe='')}", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @app.get("/api/disease/status")
