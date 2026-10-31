@@ -102,8 +102,8 @@ const renderDashboard = (dashboard, weather = null, water = null) => {
     { title: 'Soil type', value: farm.soilType || 'Not set', detail: 'Farmer supplied', tone: 'green' },
     { title: 'Weather', value: weather ? `${weather.current.temperatureC}°C · ${weather.current.condition}` : 'Unavailable', detail: weather ? `${weather.current.humidityPercent}% humidity · ${weather.current.rainfallMm} mm rain` : 'Live weather unavailable', tone: 'amber' },
     { title: 'Water requirement', value: water ? `${water.dailyIrrigationLitersEstimate} L/day est.` : 'Unavailable', detail: water ? `${water.nextSevenDaysLitersEstimate} L / 7-day estimate` : 'Needs crop, area, and live ET0', tone: 'teal' },
-    { title: 'Satellite / NDVI', value: 'Not connected', detail: 'No satellite provider', tone: 'blue' },
-    { title: 'Market prices', value: 'Not connected', detail: 'No market data provider', tone: 'purple' },
+    { title: 'Satellite / NDVI', value: integrations.satellite === 'configured' ? 'Sentinel Hub ready' : 'Needs credentials', detail: 'Sentinel-2 point sample', tone: 'blue' },
+    { title: 'Market prices', value: integrations.marketPrices === 'configured' ? 'Agmarknet API ready' : 'Needs API key', detail: 'data.gov.in mandi arrivals', tone: 'purple' },
     { title: 'Live threat alerts', value: 'Unavailable', detail: 'No verified live threat feed', tone: 'red' }
   ];
   dashboardCards.innerHTML = cards.map((card) => `
@@ -147,6 +147,37 @@ const renderWeatherForecast = (weather) => {
     : '<p class="empty-state">No live forecast is available for this saved farm location.</p>';
 };
 
+const loadYieldEstimate = async () => {
+  const output = document.getElementById('yieldResult');
+  if (!output) return;
+  output.textContent = 'Calculating an indicative yield range...';
+  try {
+    const result = await api.get('/api/yield');
+    output.innerHTML = `<strong>Crop:</strong> ${escapeHtml(result.crop)}<br><strong>Expected estimate:</strong> ${escapeHtml(result.expectedEstimateTonnes)} tonnes<br><strong>Range:</strong> ${escapeHtml(result.lowEstimateTonnes)}–${escapeHtml(result.highEstimateTonnes)} tonnes<br><strong>Area:</strong> ${escapeHtml(result.areaHectares)} ha<br><strong>Confidence:</strong> ${escapeHtml(result.confidence)}<br><small>${escapeHtml(result.notice)}</small>`;
+  } catch (error) { output.textContent = error.message; }
+};
+
+const loadMarketPrices = async () => {
+  const output = document.getElementById('marketResult');
+  if (!output) return;
+  const commodity = document.getElementById('marketCommodity').value.trim();
+  output.textContent = 'Loading mandi arrivals...';
+  try {
+    const result = await api.get('/api/markets' + (commodity ? `?commodity=${encodeURIComponent(commodity)}` : ''));
+    output.innerHTML = result.records.length ? result.records.map(row => `<div class="list-item"><strong>${escapeHtml(row.market || 'Market')}</strong><p>${escapeHtml(row.commodity)} · ${escapeHtml(row.variety || 'Variety not stated')} · ${escapeHtml(row.arrivalDate || '')}</p><p>Min ₹${escapeHtml(row.minPriceRsPerQuintal)} · Modal ₹${escapeHtml(row.modalPriceRsPerQuintal)} · Max ₹${escapeHtml(row.maxPriceRsPerQuintal)} / quintal</p></div>`).join('') + `<small class="data-source">Source: ${escapeHtml(result.source)} · ${escapeHtml(result.retrievedAt)}</small>` : '<p>No matching market records were returned.</p>';
+  } catch (error) { output.textContent = error.message; }
+};
+
+const loadSatelliteNdvi = async () => {
+  const output = vegetationMap;
+  if (!output) return;
+  output.textContent = 'Requesting Sentinel-2 imagery sample...';
+  try {
+    const result = await api.get('/api/vegetation');
+    output.innerHTML = `<strong>NDVI:</strong> ${escapeHtml(result.ndvi)}<p>Source: ${escapeHtml(result.source)} · ${escapeHtml(result.retrievedAt)}</p><small>${escapeHtml(result.notice)}</small>`;
+  } catch (error) { output.textContent = error.message; }
+};
+
 const renderAdminStats = (adminData) => {
   const stats = [
     { label: 'Registered farmers', value: adminData.farmers },
@@ -175,6 +206,8 @@ const showDashboard = async () => {
     dashboardData = dashboard;
     renderDashboard(dashboard);
     fillFarmForm(dashboard.farm || {});
+    const marketCommodityInput = document.getElementById('marketCommodity');
+    if (marketCommodityInput && dashboard.farm?.cropName) marketCommodityInput.value = dashboard.farm.cropName;
     renderActivity(history.items);
     dashboardSection.classList.remove('hidden');
     adminSection.classList.add('hidden');
@@ -259,6 +292,8 @@ const renderCurrentPage = async () => {
   });
   document.querySelector('[data-feature-view~="settings"]').classList.toggle('hidden', page !== 'settings');
   document.getElementById('downloadReportButton').classList.toggle('hidden', page !== 'reports');
+  if (page === 'yield') { loadYieldEstimate(); loadMarketPrices(); }
+  if (page === 'satellite') loadSatelliteNdvi();
 };
 
 const login = async (event) => {
@@ -666,6 +701,24 @@ const loginButton = document.getElementById('loginButton');
 const ctaSecondary = document.getElementById('ctaSecondary');
 const logoutButton = document.getElementById('logoutButton');
 const forgotPassword = document.getElementById('forgotPassword');
+
+document.getElementById('googleLoginButton').addEventListener('click', () => { window.location.href = '/auth/google/start'; });
+document.getElementById('sendOtpButton').addEventListener('click', async () => {
+  const mobile = document.getElementById('registrationMobile').value.trim();
+  const status = document.getElementById('otpStatus');
+  try { const result = await api.post('/api/auth/otp/send', { mobile }); status.textContent = result.message; }
+  catch (error) { status.textContent = error.message; }
+});
+document.getElementById('verifyOtpButton').addEventListener('click', async () => {
+  const mobile = document.getElementById('registrationMobile').value.trim();
+  const code = document.getElementById('registrationOtp').value.trim();
+  const status = document.getElementById('otpStatus');
+  try { const result = await api.post('/api/auth/otp/verify', { mobile, code }); status.textContent = result.message; status.dataset.verified = 'true'; }
+  catch (error) { status.textContent = error.message; status.dataset.verified = 'false'; }
+});
+document.getElementById('loadYieldButton').addEventListener('click', loadYieldEstimate);
+document.getElementById('loadMarketsButton').addEventListener('click', loadMarketPrices);
+document.getElementById('loadSatelliteButton').addEventListener('click', loadSatelliteNdvi);
 
 authTabs.forEach((tab) => tab.addEventListener('click', () => navigateTo(tab.dataset.tab === 'register' ? '/register' : '/login')));
 loginForm.addEventListener('submit', login);
