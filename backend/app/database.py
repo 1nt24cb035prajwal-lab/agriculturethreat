@@ -149,7 +149,7 @@ def get_farmer_for_session(token: str | None) -> dict[str, Any] | None:
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     with connect() as connection:
         row = connection.execute(
-            "SELECT f.id, f.full_name, f.mobile, f.email FROM farmer_sessions s "
+            "SELECT f.id, f.full_name, f.mobile, f.email, f.phone_verified FROM farmer_sessions s "
             "JOIN farmers f ON f.id = s.farmer_id WHERE s.token_hash = ? AND s.expires_at > ?",
             (token_hash, int(time.time())),
         ).fetchone()
