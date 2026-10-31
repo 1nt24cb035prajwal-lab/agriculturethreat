@@ -12,4 +12,4 @@ dist/
 .DS_Store
 
 backend/models/
-backend/data/*.csv
+backend/data/
