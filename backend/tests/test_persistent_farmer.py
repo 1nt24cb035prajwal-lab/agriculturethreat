@@ -217,3 +217,27 @@ def test_registration_rejects_duplicate_account_and_weak_password():
     assert client.post("/api/auth/register", json=payload).status_code == 409
     weak_payload = {**payload, "mobile": f"+1888{uuid4().int % 10_000_000:07d}", "password": "short"}
     assert client.post("/api/auth/register", json=weak_payload).status_code == 400
+
+
+def test_yield_endpoint_returns_transparent_estimate_for_saved_farm():
+    client = TestClient(app)
+    mobile = f"+1999{uuid4().int % 10_000_000:07d}"
+    client.post("/api/auth/register", json={
+        "fullName": "Yield Farmer",
+        "mobile": mobile,
+        "email": f"{uuid4().hex}@example.test",
+        "password": "CorrectHorseBattery!9",
+        "termsAccepted": True,
+    })
+    assert client.post("/api/auth/login", json={"identifier": mobile, "password": "CorrectHorseBattery!9"}).status_code == 200
+    saved = client.put("/api/farm/profile", json={
+        "farmName": "Yield Farm", "cropName": "Ragi", "state": "Karnataka",
+        "district": "Mysuru", "latitude": 12.3, "longitude": 76.6,
+        "landArea": 2, "landAreaUnit": "Acres",
+    })
+    assert saved.status_code == 200
+    result = client.get("/api/yield")
+    assert result.status_code == 200, result.text
+    assert result.json()["crop"] == "Ragi"
+    assert result.json()["confidence"].startswith("Low")
+    assert "not a trained" in result.json()["notice"]
