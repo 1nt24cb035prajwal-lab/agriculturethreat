@@ -314,7 +314,14 @@ class CropRecommendationModel:
         else:
             suitability = "Suggested alternative" if confidence >= 0.5 else "Potential fit"
 
+        ranked_indices = np.argsort(probabilities)[::-1][:3]
+        alternatives = [
+            {"crop": str(model.classes_[int(index)]), "confidencePct": int(float(probabilities[int(index)]) * 100)}
+            for index in ranked_indices
+        ]
+
         return {
+            "alternatives": alternatives,
             "crop": predicted_crop,
             "requestedCrop": crop_name,
             "confidence": round(confidence, 3),
