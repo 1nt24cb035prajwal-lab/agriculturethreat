@@ -18,7 +18,7 @@ class ProviderUnavailable(RuntimeError):
 def configured_status() -> dict[str, str]:
     return {
         "googleOAuth": "configured" if os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET") else "needs_credentials",
-        "smsOtp": "configured" if all(os.getenv(k) for k in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_VERIFY_SERVICE_SID")) else "needs_credentials",
+        "smsOtp": "disabled",
         "sentinelHub": "configured" if os.getenv("SENTINELHUB_CLIENT_ID") and os.getenv("SENTINELHUB_CLIENT_SECRET") else "needs_credentials",
         "marketPrices": "configured" if os.getenv("DATA_GOV_IN_API_KEY") else "needs_api_key",
     }
