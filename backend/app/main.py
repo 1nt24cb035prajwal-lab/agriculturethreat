@@ -317,7 +317,10 @@ async def crop_recommendation(payload: dict, farmer: dict = Depends(require_farm
             "zone": recommendation["locationZone"],
         },
         "recommendation": recommendation,
-        "demoMode": True,
+        "demoMode": not (
+            isinstance(CROP_MODEL_ENGINE.model, dict)
+            and CROP_MODEL_ENGINE.model.get("kind") == "crop_csv_v1"
+        ),
         "datasetNotice": recommendation["datasetNotice"],
     }
 
@@ -591,10 +594,14 @@ async def analyze_disease(
             "disease_detection",
             {"imageId": image_id, "filename": file.filename, "cropName": result["cropName"], "cropStage": result["cropStage"], "predictedDisease": result["predictedDisease"], "confidencePct": result["confidencePct"]},
         )
+        trained_bundle = MODEL_ENGINE.model
         return {
             "message": "Disease analysis completed.",
             "result": result,
-            "demoMode": True,
+            "demoMode": not (
+                isinstance(trained_bundle, dict)
+                and trained_bundle.get("kind") == "plant_disease_folders_v1"
+            ),
         }
     except HTTPException:
         raise
@@ -617,10 +624,22 @@ async def get_disease_history_image(image_id: str, farmer: dict = Depends(requir
 @app.get("/api/disease/status")
 async def disease_status():
     model = MODEL_ENGINE.load_or_train()
+    if isinstance(model, dict) and model.get("kind") == "plant_disease_folders_v1":
+        classifier = model["classifier"]
+        return {
+            "status": "ready",
+            "classes": list(classifier.classes_),
+            "demoMode": False,
+            "datasetImages": model["dataset_images"],
+            "classCounts": model["class_counts"],
+            "validationAccuracy": model["validation_accuracy"],
+        }
     return {
         "status": "ready",
         "classes": list(model.classes_),
         "demoMode": True,
+        "datasetImages": 0,
+        "notice": "Synthetic demonstration model only; download PlantVillage and train the real image-folder model.",
     }
 
 
