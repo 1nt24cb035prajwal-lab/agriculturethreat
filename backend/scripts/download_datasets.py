@@ -14,15 +14,18 @@ DATA_DIR = ROOT / "backend" / "data"
 CROP_CSV = DATA_DIR / "crop_recommendation.csv"
 PLANT_ZIP = DATA_DIR / "plantvillage_data.zip"
 PLANT_DIR = DATA_DIR / "plant_disease"
+SPLIT_DIR = DATA_DIR / "plantvillage_splits"
 
 CROP_MIRROR_URL = (
     "https://huggingface.co/datasets/liaad/agricultural-data/"
     "resolve/main/Crop_recommendation.csv"
 )
-PLANT_VILLAGE_URL = (
-    "https://huggingface.co/datasets/mohanty/PlantVillage/"
-    "resolve/main/data.zip"
-)
+PLANT_REPO = "https://huggingface.co/datasets/mohanty/PlantVillage/resolve/main"
+PLANT_VILLAGE_URL = f"{PLANT_REPO}/data.zip"
+SPLIT_URLS = {
+    "train": f"{PLANT_REPO}/splits/color_train.txt",
+    "test": f"{PLANT_REPO}/splits/color_test.txt",
+}
 REQUIRED_CROP_COLUMNS = [
     "N", "P", "K", "temperature", "humidity", "ph", "rainfall", "label"
 ]
@@ -56,19 +59,14 @@ def download_crop_dataset(force: bool = False) -> None:
         print(f"Crop dataset already exists: {CROP_CSV}")
         return
 
-    # Prefer the official Kaggle dataset when the Kaggle CLI is authenticated.
+    # Prefer the original Kaggle dataset when the Kaggle CLI is authenticated.
     kaggle = shutil.which("kaggle")
     if kaggle:
         result = subprocess.run(
             [
-                kaggle,
-                "datasets",
-                "download",
-                "-d",
-                "atharvaingle/crop-recommendation-dataset",
-                "--unzip",
-                "-p",
-                str(DATA_DIR),
+                kaggle, "datasets", "download",
+                "-d", "atharvaingle/crop-recommendation-dataset",
+                "--unzip", "-p", str(DATA_DIR),
             ],
             check=False,
         )
@@ -109,69 +107,90 @@ def validate_crop_csv(path: Path) -> None:
     print(f"Validated crop CSV: {rows:,} rows, {len(columns)} columns")
 
 
+def _read_split(path: Path) -> list[str]:
+    with path.open("r", encoding="utf-8") as handle:
+        return [line.strip().replace("\\", "/") for line in handle if line.strip()]
+
+
 def extract_plantvillage(force: bool = False) -> None:
-    if PLANT_DIR.exists() and any(PLANT_DIR.rglob("*")) and not force:
-        print(f"Plant disease image folders already exist: {PLANT_DIR}")
+    train_dir = PLANT_DIR / "train"
+    test_dir = PLANT_DIR / "test"
+    if train_dir.is_dir() and test_dir.is_dir() and any(train_dir.rglob("*")) and any(test_dir.rglob("*")) and not force:
+        print(f"PlantVillage train/test folders already exist: {PLANT_DIR}")
         return
 
     download_file(PLANT_VILLAGE_URL, PLANT_ZIP, force=force)
     if not zipfile.is_zipfile(PLANT_ZIP):
         raise ValueError(f"PlantVillage download is not a valid ZIP file: {PLANT_ZIP}")
 
+    SPLIT_DIR.mkdir(parents=True, exist_ok=True)
+    split_paths = {}
+    for split_name, url in SPLIT_URLS.items():
+        split_path = SPLIT_DIR / f"color_{split_name}.txt"
+        download_file(url, split_path, force=force)
+        split_paths[split_name] = _read_split(split_path)
+
     if PLANT_DIR.exists():
         shutil.rmtree(PLANT_DIR)
-    PLANT_DIR.mkdir(parents=True, exist_ok=True)
+    for split_name in ("train", "test"):
+        (PLANT_DIR / split_name).mkdir(parents=True, exist_ok=True)
 
-    copied = 0
-    classes: set[str] = set()
+    copied = {"train": 0, "test": 0}
+    classes = {"train": set(), "test": set()}
     with zipfile.ZipFile(PLANT_ZIP) as archive:
-        for member in archive.infolist():
-            if member.is_dir():
-                continue
-            member_path = PurePosixPath(member.filename)
-            if member_path.suffix.lower() not in IMAGE_EXTENSIONS:
-                continue
+        members = {}
+        for info in archive.infolist():
+            normalized = PurePosixPath(info.filename).as_posix().lstrip("./")
+            members[normalized] = info
 
-            # PlantVillage labels use Crop___Disease folder names. Select the
-            # deepest such folder so split/modality wrappers do not become labels.
-            class_indexes = [
-                index for index, part in enumerate(member_path.parts)
-                if "___" in part
-            ]
-            if class_indexes:
-                class_index = class_indexes[-1]
-                class_name = member_path.parts[class_index]
-                relative_parts = member_path.parts[class_index + 1 :]
-            else:
-                if len(member_path.parts) < 2:
-                    continue
-                class_name = member_path.parts[-2]
-                relative_parts = (member_path.name,)
+        for split_name, file_list in split_paths.items():
+            for relative_name in file_list:
+                member = members.get(relative_name)
+                if member is None:
+                    # Some ZIP writers add a single wrapper directory.
+                    member = next(
+                        (
+                            info for name, info in members.items()
+                            if name.endswith("/" + relative_name)
+                        ),
+                        None,
+                    )
+                if member is None:
+                    raise FileNotFoundError(
+                        f"PlantVillage image listed in {split_name} split was not found: {relative_name}"
+                    )
 
-            if not class_name or class_name in {".", ".."}:
-                continue
-            relative = Path(*relative_parts) if relative_parts else Path(member_path.name)
-            target = (PLANT_DIR / class_name / relative).resolve()
-            if not target.is_relative_to(PLANT_DIR.resolve()):
-                raise ValueError(f"Unsafe path in PlantVillage archive: {member.filename}")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with archive.open(member) as source, target.open("wb") as output:
-                shutil.copyfileobj(source, output, length=1024 * 1024)
-            copied += 1
-            classes.add(class_name)
+                parts = PurePosixPath(relative_name).parts
+                if len(parts) < 4 or parts[0] != "raw" or parts[1] != "color":
+                    raise ValueError(f"Unexpected PlantVillage color image path: {relative_name}")
+                class_name = parts[2]
+                if "___" not in class_name:
+                    raise ValueError(f"PlantVillage class label is missing crop/disease separator: {class_name}")
+                image_relative = Path(*parts[3:])
+                target = (PLANT_DIR / split_name / class_name / image_relative).resolve()
+                if not target.is_relative_to(PLANT_DIR.resolve()):
+                    raise ValueError(f"Unsafe path in PlantVillage archive: {relative_name}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(member) as source, target.open("wb") as output:
+                    shutil.copyfileobj(source, output, length=1024 * 1024)
+                copied[split_name] += 1
+                classes[split_name].add(class_name)
 
-    if copied < 30 or len(classes) < 2:
+    if copied["train"] < 30 or copied["test"] < 10 or classes["train"] != classes["test"]:
         shutil.rmtree(PLANT_DIR, ignore_errors=True)
         raise ValueError(
-            "PlantVillage archive did not contain enough class-labelled images. "
-            "Check the dataset archive layout before training."
+            "PlantVillage archive did not contain matching train/test class folders. "
+            "The download may be incomplete or its layout may have changed."
         )
-    print(f"Extracted {copied:,} images across {len(classes)} classes to {PLANT_DIR}")
+    print(
+        f"Prepared PlantVillage color split: {copied['train']:,} train images, "
+        f"{copied['test']:,} test images, {len(classes['train'])} classes"
+    )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Download the crop recommendation CSV and PlantVillage images."
+        description="Download the crop recommendation CSV and PlantVillage color images."
     )
     parser.add_argument("--skip-crop", action="store_true")
     parser.add_argument("--skip-disease", action="store_true")
@@ -184,7 +203,7 @@ def main() -> int:
         extract_plantvillage(force=args.force)
 
     print("\nDataset preparation complete.")
-    print("Train crop model:   python backend/scripts/train_crop_model.py")
+    print("Train crop model:    python backend/scripts/train_crop_model.py")
     print("Train disease model: python backend/scripts/train_disease_model.py")
     return 0
 
