@@ -15,14 +15,13 @@ python -m venv .venv
 
 Open http://localhost:8000.
 
-To load local provider settings, copy `backend/.env.example` to `backend/.env` and start with:
+Copy local provider settings:
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --reload --env-file backend\.env
+copy backend\\.env.example backend\\.env
 ```
 
-Never commit `.env` or paste provider secrets into source control.
-
+The application automatically loads `backend/.env` at startup, so the normal Uvicorn command above is enough. 
 ## Google-only farmer authentication
 
 The farmer-facing sign-in uses Google OAuth. A first-time Google sign-in creates a farmer account after Google returns a verified email. Existing accounts are linked by verified email. After sign-in, the farmer fills in farm, crop, soil, and map-location details in the dashboard. Twilio OTP and phone-based passwords are not required for the sign-in flow.
@@ -67,7 +66,7 @@ From the repository root, install the backend dependencies and download both dat
 The downloader prepares:
 
 - `backend/data/crop_recommendation.csv`: the 2,200-row crop recommendation dataset with N, P, K, temperature, humidity, pH, rainfall, and crop label columns. It prefers the Kaggle CLI if configured and otherwise uses a public Hugging Face CSV mirror.
-- `backend/data/plantvillage_data.zip` and `backend/data/plant_disease/<Crop___Disease>/...`: the PlantVillage leaf image dataset (about 2.2 GB) extracted into class-labelled folders.
+- `backend/data/plantvillage_data.zip` and `backend/data/plant_disease/train/<Crop___Disease>/...` plus `test/<Crop___Disease>/...`: the PlantVillage color images (about 2.2 GB) arranged using the published train/test manifests.
 
 Train the crop recommendation model and disease image model:
 
