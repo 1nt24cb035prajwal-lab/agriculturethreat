@@ -50,7 +50,7 @@ Farmer accounts, farm profiles, image records, and activity history are stored i
 - Weather and forecast: Open-Meteo, using saved farm coordinates.
 - Location search and reverse geocoding: OpenStreetMap Nominatim.
 - Satellite NDVI: Sentinel Hub Sentinel-2 L2A point sample; configure `SENTINELHUB_CLIENT_ID` and `SENTINELHUB_CLIENT_SECRET`.
-- Mandi prices: data.gov.in Agmarknet resource; configure `DATA_GOV_IN_API_KEY` and, if needed, `DATA_GOV_IN_MARKET_RESOURCE_ID`. The farmer dashboard also links directly to the official [Agmarknet live market portal](https://agmarknet.gov.in/home), which does not require the app's API key.
+- Mandi prices: the farmer dashboard links directly to the [Agmarknet visualization dashboard](https://visualize.data.gov.in/?inst=9ef84268-d588-465a-a308-a864a43d0070). In-app price results use the data.gov.in API and require `DATA_GOV_IN_API_KEY` and, if needed, `DATA_GOV_IN_MARKET_RESOURCE_ID`.
 - Weather threat alerts: current farm weather and a seven-day forecast from Open-Meteo are checked for configured heat, cold, strong-wind, and heavy-rain thresholds. Alerts refresh on dashboard load and every 15 minutes while open. These are weather indicators only, not pest/disease diagnoses or official emergency warnings.
 - Yield: low-confidence reference-range estimate, not a trained regional yield model.
 
