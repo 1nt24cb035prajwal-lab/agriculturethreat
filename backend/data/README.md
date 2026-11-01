@@ -19,9 +19,9 @@ The downloader prefers the Kaggle CLI if it is installed and authenticated; othe
 - License declared on the Hugging Face dataset card: CC BY-SA 3.0
 - Dataset card describes 54,306 images, 14 crop species, and 26 diseases.
 - Downloaded archive: `plantvillage_data.zip`
-- Extracted training folders: `plant_disease/<Crop___Disease>/...`
+- Extracted folders: `plant_disease/train/<Crop___Disease>/...` and `plant_disease/test/<Crop___Disease>/...`.
 
-The downloader streams the archive into class-labelled folders compatible with `backend/scripts/train_disease_model.py`. Keep the attribution and share-alike terms with any redistributed adapted dataset or model; verify the source terms for your intended use.
+The downloader extracts only the RGB color images and uses the dataset's published `color_train.txt` and `color_test.txt` manifests. These splits preserve leaf grouping, avoiding the leakage that can occur when images of the same physical leaf are randomly split. Keep the attribution and share-alike terms with any redistributed adapted dataset or model; verify the source terms for your intended use.
 
 ## Train the models
 
