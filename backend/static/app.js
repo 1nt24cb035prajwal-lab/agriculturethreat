@@ -689,3 +689,20 @@ document.getElementById('downloadReportButton').addEventListener('click', async 
 });
 
 renderCurrentPage();
+
+
+// Show a useful explanation when Google redirects back with an authentication error.
+const googleAuthErrors = {
+  google_not_configured: 'Google sign-in is not configured yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to backend/.env, then restart the server.',
+  google_state: 'Google sign-in expired or the browser changed host during sign-in. Open http://localhost:8000 and try again.',
+  google_exchange: 'Google could not complete sign-in. Check that the OAuth client is a Web application and that its redirect URI exactly matches backend/.env.',
+  google_cancelled: 'Google sign-in was cancelled. Select your account and approve the sign-in request to continue.'
+};
+const googleAuthError = new URLSearchParams(window.location.search).get('auth_error');
+if (googleAuthError && googleAuthErrors[googleAuthError]) {
+  const message = document.createElement('p');
+  message.className = 'map-status';
+  message.setAttribute('role', 'alert');
+  message.textContent = googleAuthErrors[googleAuthError];
+  document.querySelector('.google-auth-content')?.append(message);
+}
