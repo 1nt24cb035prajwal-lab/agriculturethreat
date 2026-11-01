@@ -137,43 +137,66 @@ class PlantDiseaseModel:
         return features.astype(np.float32)
 
     def train_from_directory(self, dataset_dir: Path | None = None):
-        """Train from an image dataset arranged as class-name subfolders."""
+        """Train from class folders, using supplied train/test folders when present."""
         source = Path(dataset_dir or self.image_dataset_path)
         if not source.is_dir():
             raise FileNotFoundError(
-                f"Disease image dataset not found: {source}. Add class-labelled image folders first."
+                f"Disease image dataset not found: {source}. Download the labelled image dataset first."
             )
 
         image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-        features, labels = [], []
-        class_counts = {}
-        for class_dir in sorted(path for path in source.iterdir() if path.is_dir()):
-            for image_path in sorted(class_dir.rglob("*")):
-                if image_path.suffix.lower() not in image_extensions:
-                    continue
-                try:
-                    with Image.open(image_path) as image:
-                        features.append(self._extract_features(image))
-                    labels.append(class_dir.name)
-                    class_counts[class_dir.name] = class_counts.get(class_dir.name, 0) + 1
-                except (OSError, ValueError) as exc:
-                    raise ValueError(f"Unable to read disease image: {image_path}") from exc
 
-        if len(features) < 30 or len(class_counts) < 2:
-            raise ValueError("Use at least 30 labelled images across at least two disease classes.")
-        if min(class_counts.values()) < 2:
-            raise ValueError("Each disease class needs at least two images for stratified validation.")
+        def load_class_folders(folder: Path):
+            features, labels, counts = [], [], {}
+            for class_dir in sorted(path for path in folder.iterdir() if path.is_dir()):
+                for image_path in sorted(class_dir.rglob("*")):
+                    if image_path.suffix.lower() not in image_extensions:
+                        continue
+                    try:
+                        with Image.open(image_path) as image:
+                            features.append(self._extract_features(image))
+                        labels.append(class_dir.name)
+                        counts[class_dir.name] = counts.get(class_dir.name, 0) + 1
+                    except (OSError, ValueError) as exc:
+                        raise ValueError(f"Unable to read disease image: {image_path}") from exc
+            if not features:
+                raise ValueError(f"No labelled images found under {folder}")
+            return np.vstack(features), np.asarray(labels), counts
 
-        X = np.vstack(features)
-        y = np.asarray(labels)
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
-        )
+        train_dir = source / "train"
+        test_dir = source / "test"
+        if train_dir.is_dir() and test_dir.is_dir():
+            X_train, y_train, train_counts = load_class_folders(train_dir)
+            X_test, y_test, test_counts = load_class_folders(test_dir)
+            if set(train_counts) != set(test_counts):
+                raise ValueError("Training and test folders must contain the same disease classes.")
+            if min(train_counts.values()) < 2 or min(test_counts.values()) < 1:
+                raise ValueError("Each disease class needs at least two train images and one test image.")
+            class_counts = {
+                label: train_counts[label] + test_counts[label]
+                for label in sorted(train_counts)
+            }
+            split_strategy = "provided_train_test_split"
+        else:
+            X, y, class_counts = load_class_folders(source)
+            if len(X) < 30 or len(class_counts) < 2:
+                raise ValueError("Use at least 30 labelled images across at least two disease classes.")
+            if min(class_counts.values()) < 2:
+                raise ValueError("Each disease class needs at least two images for stratified validation.")
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42, stratify=y
+            )
+            split_strategy = "stratified_random_80_20"
+
+        if len(X_train) < 30 or len(set(y_train)) < 2 or len(set(y_test)) < 2:
+            raise ValueError("The disease train/test split must contain at least two classes and enough images.")
+
         classifier = RandomForestClassifier(
             n_estimators=300,
             random_state=42,
             class_weight="balanced",
             min_samples_leaf=2,
+            n_jobs=-1,
         )
         classifier.fit(X_train, y_train)
         accuracy = float(accuracy_score(y_test, classifier.predict(X_test)))
@@ -181,10 +204,11 @@ class PlantDiseaseModel:
             "kind": "plant_disease_folders_v1",
             "classifier": classifier,
             "dataset_path": source.name,
-            "dataset_images": len(features),
+            "dataset_images": int(len(X_train) + len(X_test)),
             "class_counts": class_counts,
             "validation_accuracy": accuracy,
-            "validation_images": len(y_test),
+            "validation_images": int(len(y_test)),
+            "split_strategy": split_strategy,
         }
         joblib.dump(bundle, self.model_path)
         self.model = bundle
