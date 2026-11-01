@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import shutil
 import subprocess
 import sys
@@ -12,13 +13,20 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "backend" / "data"
 CROP_CSV = DATA_DIR / "crop_recommendation.csv"
+YIELD_CSV = DATA_DIR / "india_crop_production.csv"
 PLANT_ZIP = DATA_DIR / "plantvillage_data.zip"
+PLANT_ZIP_ALTERNATE = DATA_DIR / "plantvillage" / "data.zip"
 PLANT_DIR = DATA_DIR / "plant_disease"
+PLANT_PREPARED_MARKER = PLANT_DIR / ".prepared.json"
 SPLIT_DIR = DATA_DIR / "plantvillage_splits"
 
 CROP_MIRROR_URL = (
     "https://huggingface.co/datasets/liaad/agricultural-data/"
     "resolve/main/Crop_recommendation.csv"
+)
+YIELD_DATASET_URL = (
+    "https://huggingface.co/datasets/jason1966/"
+    "abhinand05_crop-production-in-india/resolve/main/crop_production.csv"
 )
 PLANT_REPO = "https://huggingface.co/datasets/mohanty/PlantVillage/resolve/main"
 PLANT_VILLAGE_URL = f"{PLANT_REPO}/data.zip"
@@ -107,6 +115,24 @@ def validate_crop_csv(path: Path) -> None:
     print(f"Validated crop CSV: {rows:,} rows, {len(columns)} columns")
 
 
+def download_yield_dataset(force: bool = False) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if not YIELD_CSV.exists() or YIELD_CSV.stat().st_size == 0 or force:
+        download_file(YIELD_DATASET_URL, YIELD_CSV, force=force)
+    required = {"State_Name", "District_Name", "Crop_Year", "Season", "Crop", "Area", "Production"}
+    with YIELD_CSV.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        missing = required - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(
+                f"{YIELD_CSV} is missing required columns: {', '.join(sorted(missing))}."
+            )
+        rows = sum(1 for _ in reader)
+    if rows < 100:
+        raise ValueError(f"Yield dataset has only {rows} rows; at least 100 are required.")
+    print(f"Validated India crop production CSV: {rows:,} rows")
+
+
 def _read_split(path: Path) -> list[str]:
     with path.open("r", encoding="utf-8") as handle:
         return [line.strip().replace("\\", "/") for line in handle if line.strip()]
@@ -115,13 +141,23 @@ def _read_split(path: Path) -> list[str]:
 def extract_plantvillage(force: bool = False) -> None:
     train_dir = PLANT_DIR / "train"
     test_dir = PLANT_DIR / "test"
-    if train_dir.is_dir() and test_dir.is_dir() and any(train_dir.rglob("*")) and any(test_dir.rglob("*")) and not force:
-        print(f"PlantVillage train/test folders already exist: {PLANT_DIR}")
-        return
+    if PLANT_PREPARED_MARKER.is_file() and not force:
+        prepared = json.loads(PLANT_PREPARED_MARKER.read_text(encoding="utf-8"))
+        actual_counts = {
+            "train": sum(1 for path in train_dir.rglob("*") if path.suffix.lower() in IMAGE_EXTENSIONS),
+            "test": sum(1 for path in test_dir.rglob("*") if path.suffix.lower() in IMAGE_EXTENSIONS),
+        }
+        if actual_counts == prepared.get("image_counts"):
+            print(f"PlantVillage train/test folders already exist: {PLANT_DIR}")
+            return
 
-    download_file(PLANT_VILLAGE_URL, PLANT_ZIP, force=force)
-    if not zipfile.is_zipfile(PLANT_ZIP):
-        raise ValueError(f"PlantVillage download is not a valid ZIP file: {PLANT_ZIP}")
+    archive_path = next(
+        (path for path in (PLANT_ZIP, PLANT_ZIP_ALTERNATE) if path.is_file()),
+        PLANT_ZIP,
+    )
+    download_file(PLANT_VILLAGE_URL, archive_path, force=force)
+    if not zipfile.is_zipfile(archive_path):
+        raise ValueError(f"PlantVillage download is not a valid ZIP file: {archive_path}")
 
     SPLIT_DIR.mkdir(parents=True, exist_ok=True)
     split_paths = {}
@@ -137,7 +173,7 @@ def extract_plantvillage(force: bool = False) -> None:
 
     copied = {"train": 0, "test": 0}
     classes = {"train": set(), "test": set()}
-    with zipfile.ZipFile(PLANT_ZIP) as archive:
+    with zipfile.ZipFile(archive_path) as archive:
         members = {}
         for info in archive.infolist():
             normalized = PurePosixPath(info.filename).as_posix().lstrip("./")
@@ -186,6 +222,10 @@ def extract_plantvillage(force: bool = False) -> None:
         f"Prepared PlantVillage color split: {copied['train']:,} train images, "
         f"{copied['test']:,} test images, {len(classes['train'])} classes"
     )
+    PLANT_PREPARED_MARKER.write_text(
+        json.dumps({"image_counts": copied, "classes": len(classes["train"])}),
+        encoding="utf-8",
+    )
 
 
 def main() -> int:
@@ -193,12 +233,15 @@ def main() -> int:
         description="Download the crop recommendation CSV and PlantVillage color images."
     )
     parser.add_argument("--skip-crop", action="store_true")
+    parser.add_argument("--skip-yield", action="store_true")
     parser.add_argument("--skip-disease", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
     if not args.skip_crop:
         download_crop_dataset(force=args.force)
+    if not args.skip_yield:
+        download_yield_dataset(force=args.force)
     if not args.skip_disease:
         extract_plantvillage(force=args.force)
 

@@ -111,7 +111,7 @@ const renderDashboard = (dashboard, weather = null, water = null, threats = null
     <div><strong>Location:</strong> ${escapeHtml(location)}</div>
     <div id="waterEstimateDetails"><strong>Water requirement:</strong> ${water ? `${escapeHtml(water.dailyIrrigationLitersEstimate)} L/day · ${escapeHtml(water.nextSevenDaysLitersEstimate)} L over 7 days` : 'Save crop, area, and map coordinates for an estimate.'}</div>
     ${water ? `<small>${escapeHtml(water.notice)}</small>` : ''}
-    <div><strong>Yield and soil-test fertilizer:</strong> No validated regional yield or soil-test data is connected.</div>
+    <div><strong>Yield and soil-test fertilizer:</strong> Historical regional yield estimates are available in the Yield section; no validated soil-test fertilizer data is connected.</div>
   `;
   document.getElementById('settingsSummary').innerHTML = `
     <div><strong>Farmer:</strong> ${escapeHtml(farmer.name)}</div>
@@ -172,10 +172,13 @@ const renderWeatherForecast = (weather) => {
 const loadYieldEstimate = async () => {
   const output = document.getElementById('yieldResult');
   if (!output) return;
-  output.textContent = 'Calculating an indicative yield range...';
+  output.textContent = 'Loading historical regional yield prediction...';
   try {
     const result = await api.get('/api/yield');
-    output.innerHTML = `<strong>Crop:</strong> ${escapeHtml(result.crop)}<br><strong>Expected estimate:</strong> ${escapeHtml(result.expectedEstimateTonnes)} tonnes<br><strong>Range:</strong> ${escapeHtml(result.lowEstimateTonnes)}–${escapeHtml(result.highEstimateTonnes)} tonnes<br><strong>Area:</strong> ${escapeHtml(result.areaHectares)} ha<br><strong>Confidence:</strong> ${escapeHtml(result.confidence)}<br><small>${escapeHtml(result.notice)}</small>`;
+    const modelMetrics = result.modelMetrics
+      ? `<br><strong>Chronological holdout:</strong> MAE ${escapeHtml(result.modelMetrics.maeTonnesPerHectare)} t/ha · R² ${escapeHtml(result.modelMetrics.r2)}`
+      : '';
+    output.innerHTML = `<strong>Crop:</strong> ${escapeHtml(result.crop)}<br><strong>Expected estimate:</strong> ${escapeHtml(result.expectedEstimateTonnes)} tonnes<br><strong>Yield:</strong> ${escapeHtml(result.predictedYieldTonnesPerHectare ?? 'Reference range')} tonnes/ha<br><strong>Range:</strong> ${escapeHtml(result.lowEstimateTonnes)}–${escapeHtml(result.highEstimateTonnes)} tonnes<br><strong>Area:</strong> ${escapeHtml(result.areaHectares)} ha<br><strong>Confidence:</strong> ${escapeHtml(result.confidence)}${modelMetrics}<br><small>${escapeHtml(result.notice)}</small>`;
   } catch (error) { output.textContent = error.message; }
 };
 
@@ -287,7 +290,7 @@ const routeTitles = {
   disease: ['Image review', 'Disease Detection'],
   weather: ['Open-Meteo', 'Weather Monitoring'],
   satellite: ['Provider unavailable', 'Satellite Vegetation'],
-  yield: ['History only', 'Crop Yield'],
+  yield: ['Historical district-level model', 'Crop Yield'],
   threats: ['Open-Meteo indicators', 'Weather Threat Alerts'],
   history: ['Your account records', 'Activity History'],
   reports: ['Export saved records', 'Reports'],

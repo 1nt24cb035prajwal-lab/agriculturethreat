@@ -18,7 +18,9 @@ def main() -> int:
         "images": bundle["dataset_images"],
         "class_counts": bundle["class_counts"],
         "test_images": bundle.get("test_images") or bundle["validation_images"],
-        "test_accuracy": round(bundle.get("test_accuracy") or bundle["validation_accuracy"], 4),
+        "test_accuracy": round(bundle["test_accuracy"] if bundle.get("test_accuracy") is not None else bundle["validation_accuracy"], 4),
+        "macro_f1": round(bundle["macro_f1"], 4),
+        "model": "HOG + RGB/HSV histograms + SGD logistic classifier",
         "model_path": str(model.model_path),
     }
     print(json.dumps(report, indent=2))

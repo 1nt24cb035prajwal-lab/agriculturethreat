@@ -247,7 +247,9 @@ def test_yield_endpoint_returns_transparent_estimate_for_saved_farm():
         "landArea": 2, "landAreaUnit": "Acres",
     })
     assert saved.status_code == 200
-    result = client.get("/api/yield")
+    with patch("backend.app.main.YIELD_MODEL_ENGINE") as model_engine:
+        model_engine.model_path.is_file.return_value = False
+        result = client.get("/api/yield")
     assert result.status_code == 200, result.text
     assert result.json()["crop"] == "Ragi"
     assert result.json()["confidence"].startswith("Low")

@@ -8,8 +8,9 @@ import joblib
 import numpy as np
 from PIL import Image
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import SGDClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
@@ -136,6 +137,47 @@ class PlantDiseaseModel:
         features = np.concatenate([mean, std, [brightness, contrast, texture]])
         return features.astype(np.float32)
 
+    def _extract_plantvillage_features(self, image: Image.Image) -> np.ndarray:
+        rgb_image = image.convert("RGB").resize((64, 64), Image.Resampling.BILINEAR)
+        rgb = np.asarray(rgb_image, dtype=np.float32)
+        gray = rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+        gradient_y, gradient_x = np.gradient(gray)
+        magnitude = np.hypot(gradient_x, gradient_y)
+        orientation = np.mod(np.arctan2(gradient_y, gradient_x), np.pi) * (9 / np.pi)
+        lower_bin = np.floor(orientation).astype(np.int32) % 9
+        bin_fraction = orientation - np.floor(orientation)
+        cell_rows, cell_columns = np.indices((64, 64))
+        cell_ids = ((cell_rows // 8) * 8 + cell_columns // 8).ravel()
+        magnitude = magnitude.ravel()
+        lower_bin = lower_bin.ravel()
+        bin_fraction = bin_fraction.ravel()
+        cell_histograms = np.zeros((64, 9), dtype=np.float32)
+        for bin_index in range(9):
+            lower_weights = magnitude * (1 - bin_fraction) * (lower_bin == bin_index)
+            upper_weights = magnitude * bin_fraction * (((lower_bin + 1) % 9) == bin_index)
+            cell_histograms[:, bin_index] = (
+                np.bincount(cell_ids, weights=lower_weights, minlength=64)
+                + np.bincount(cell_ids, weights=upper_weights, minlength=64)
+            )
+        cell_histograms = cell_histograms.reshape(8, 8, 9)
+        cell_histograms /= np.maximum(
+            np.linalg.norm(cell_histograms, axis=2, keepdims=True),
+            1e-6,
+        )
+
+        color_histograms = []
+        hsv = np.asarray(rgb_image.convert("HSV"), dtype=np.uint8)
+        for channel in range(3):
+            color_histograms.extend(
+                np.histogram(rgb[:, :, channel], bins=16, range=(0, 256))[0].astype(np.float32)
+                / (64 * 64)
+            )
+            color_histograms.extend(
+                np.histogram(hsv[:, :, channel], bins=16, range=(0, 256))[0].astype(np.float32)
+                / (64 * 64)
+            )
+        return np.concatenate([cell_histograms.ravel(), color_histograms]).astype(np.float32)
+
     def train_from_directory(self, dataset_dir: Path | None = None):
         """Train from class folders, using supplied train/test folders when present."""
         source = Path(dataset_dir or self.image_dataset_path)
@@ -154,7 +196,7 @@ class PlantDiseaseModel:
                         continue
                     try:
                         with Image.open(image_path) as image:
-                            features.append(self._extract_features(image))
+                            features.append(self._extract_plantvillage_features(image))
                         labels.append(class_dir.name)
                         counts[class_dir.name] = counts.get(class_dir.name, 0) + 1
                     except (OSError, ValueError) as exc:
@@ -191,22 +233,27 @@ class PlantDiseaseModel:
         if len(X_train) < 30 or len(set(y_train)) < 2 or len(set(y_test)) < 2:
             raise ValueError("The disease train/test split must contain at least two classes and enough images.")
 
-        classifier = RandomForestClassifier(
-            n_estimators=300,
+        classifier = SGDClassifier(
+            loss="log_loss",
+            alpha=0.0001,
+            max_iter=80,
+            tol=0.001,
             random_state=42,
             class_weight="balanced",
-            min_samples_leaf=2,
             n_jobs=-1,
         )
         classifier.fit(X_train, y_train)
-        accuracy = float(accuracy_score(y_test, classifier.predict(X_test)))
+        predictions = classifier.predict(X_test)
+        accuracy = float(accuracy_score(y_test, predictions))
+        macro_f1 = float(f1_score(y_test, predictions, average="macro", zero_division=0))
         bundle = {
-            "kind": "plant_disease_folders_v1",
+            "kind": "plant_disease_hog_v2",
             "classifier": classifier,
             "dataset_path": source.name,
             "dataset_images": int(len(X_train) + len(X_test)),
             "class_counts": class_counts,
             "validation_accuracy": accuracy,
+            "macro_f1": macro_f1,
             "validation_images": int(len(y_test)),
             "test_accuracy": accuracy if split_strategy == "provided_train_test_split" else None,
             "test_images": int(len(y_test)) if split_strategy == "provided_train_test_split" else None,
@@ -244,14 +291,29 @@ class PlantDiseaseModel:
         if self.model is not None:
             return self.model
         if self.image_dataset_path.is_dir():
-            if not self.model_path.exists() or max(
+            needs_training = not self.model_path.exists()
+            if not needs_training:
+                cached_model = joblib.load(self.model_path)
+                needs_training = not (
+                    isinstance(cached_model, dict)
+                    and cached_model.get("kind") == "plant_disease_hog_v2"
+                )
+                if not needs_training:
+                    self.model = cached_model
+            if not needs_training and max(
                 (path.stat().st_mtime for path in self.image_dataset_path.rglob("*") if path.is_file()),
                 default=0,
             ) > self.model_path.stat().st_mtime:
+                needs_training = True
+            if needs_training:
                 return self.train_from_directory(self.image_dataset_path)
+            return self.model
         if self.model_path.exists():
             self.model = joblib.load(self.model_path)
-            if isinstance(self.model, dict) and self.model.get("kind") == "plant_disease_folders_v1":
+            if isinstance(self.model, dict) and self.model.get("kind") in {
+                "plant_disease_folders_v1",
+                "plant_disease_hog_v2",
+            }:
                 return self.model
             if getattr(self.model, "n_features_in_", None) == 9:
                 return self.model
@@ -260,22 +322,32 @@ class PlantDiseaseModel:
 
     def predict(self, image: Image.Image):
         loaded = self.load_or_train()
-        if isinstance(loaded, dict) and loaded.get("kind") == "plant_disease_folders_v1":
+        if isinstance(loaded, dict) and loaded.get("kind") in {
+            "plant_disease_folders_v1",
+            "plant_disease_hog_v2",
+        }:
             model = loaded["classifier"]
             score_name = (
                 "test accuracy"
                 if loaded.get("split_strategy") == "provided_train_test_split"
                 else "validation accuracy"
             )
+            score_details = f"held-out {score_name} {loaded['validation_accuracy']:.1%}"
+            if loaded.get("macro_f1") is not None:
+                score_details += f", macro-F1 {loaded['macro_f1']:.1%}"
             warning = (
                 f"Prototype image model trained on {loaded['dataset_images']} labelled images; "
-                f"held-out {score_name} {loaded['validation_accuracy']:.1%}. "
+                f"{score_details}. "
                 "This dataset score is not a field diagnosis; confirm with an agricultural expert."
             )
         else:
             model = loaded
             warning = "Prototype classifier trained on synthetic samples; this is not a diagnosis. Confirm with a local agronomist."
-        features = self._extract_features(image).reshape(1, -1)
+        features = (
+            self._extract_plantvillage_features(image)
+            if isinstance(loaded, dict) and loaded.get("kind") == "plant_disease_hog_v2"
+            else self._extract_features(image)
+        ).reshape(1, -1)
         probabilities = model.predict_proba(features)[0]
         label = str(model.classes_[int(np.argmax(probabilities))])
         confidence = float(np.max(probabilities))

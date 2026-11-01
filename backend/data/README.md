@@ -1,6 +1,6 @@
 # Dataset sources and local storage
 
-Run `python backend/scripts/download_datasets.py` from the repository root to prepare both datasets under this directory.
+Run `python backend/scripts/download_datasets.py` from the repository root to prepare the datasets under this directory.
 
 ## Crop recommendation
 
@@ -11,6 +11,16 @@ Run `python backend/scripts/download_datasets.py` from the repository root to pr
 - The commonly cited version contains 2,200 rows and 22 crop labels.
 
 The downloader prefers the Kaggle CLI if it is installed and authenticated; otherwise it uses the public Hugging Face CSV mirror. Review the original dataset terms and attribution before redistributing the CSV or using it commercially.
+
+## Crop yield
+
+- Dataset: [Crop Production in India](https://huggingface.co/datasets/jason1966/abhinand05_crop-production-in-india), mirrored from [Kaggle](https://www.kaggle.com/datasets/abhinand05/crop-production-in-india)
+- Expected file: `india_crop_production.csv`
+- The downloaded snapshot contains 246,091 records from 1997–2015 and 124 crop labels.
+- Features: state, district, crop year, season, crop, area, and production. Yield is derived as production divided by area.
+- The mirror marks its license as unknown. Do not redistribute the CSV or trained model until the original dataset terms are reviewed.
+
+The yield trainer evaluates on later years that are excluded from training and reports MAE, RMSE, R², and the share of predictions within 25% of observed yield. It trains on all valid rows after the holdout evaluation, uses the 254 most common districts plus an "other" bucket, and retains all supported crop labels. This is regional historical data, not a farm-level yield benchmark.
 
 ## Plant disease images
 
@@ -25,10 +35,11 @@ The downloader extracts only the RGB color images and uses the dataset's publish
 
 ## Train the models
 
-After both downloads finish:
+After the downloads and image preparation finish:
 
 ```powershell
 python backend\scripts\train_crop_model.py
+python backend\scripts\train_yield_model.py
 python backend\scripts\train_disease_model.py
 ```
 
@@ -36,4 +47,4 @@ The resulting model files are written to `backend/models/`. They are deliberatel
 
 ## Important limitations
 
-PlantVillage is a controlled-image research benchmark. The current disease pipeline uses compact image colour/texture features and a Random Forest, not a field-validated diagnostic CNN. Its hold-out score must not be treated as clinical/agronomic certainty. Confirm disease and treatment with an agricultural expert.
+PlantVillage is a controlled-image research benchmark. The disease model uses HOG and color-histogram features with a linear classifier, not a field-validated diagnostic CNN. Its published split score must not be treated as field diagnostic accuracy. Confirm disease and treatment with an agricultural expert.

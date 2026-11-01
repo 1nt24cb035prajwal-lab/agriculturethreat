@@ -22,8 +22,10 @@ from . import database
 from . import integrations
 from . import advanced_services
 from .ml_model import CropRecommendationModel, PlantDiseaseModel
+from .yield_model import YieldPredictionModel
 MODEL_ENGINE = PlantDiseaseModel(BASE_DIR)
 CROP_MODEL_ENGINE = CropRecommendationModel(BASE_DIR)
+YIELD_MODEL_ENGINE = YieldPredictionModel(BASE_DIR)
 
 app = FastAPI(title="Agriculture Threat Fusion", version="1.0.0")
 
@@ -504,7 +506,11 @@ async def get_fertilizer(farmer: dict = Depends(require_farmer)):
 async def get_yield(farmer: dict = Depends(require_farmer)):
     farm = database.get_farm(farmer["id"])
     try:
-        result = advanced_services.estimate_yield(farm)
+        result = (
+            YIELD_MODEL_ENGINE.predict(farm)
+            if YIELD_MODEL_ENGINE.model_path.is_file()
+            else advanced_services.estimate_yield(farm)
+        )
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     database.record_activity(farmer["id"], "yield_estimate", {"crop": result["crop"], "expectedEstimateTonnes": result["expectedEstimateTonnes"], "method": result["method"]})
@@ -643,7 +649,10 @@ async def get_disease_history_image(image_id: str, farmer: dict = Depends(requir
 @app.get("/api/disease/status")
 async def disease_status():
     model = MODEL_ENGINE.load_or_train()
-    if isinstance(model, dict) and model.get("kind") == "plant_disease_folders_v1":
+    if isinstance(model, dict) and model.get("kind") in {
+        "plant_disease_folders_v1",
+        "plant_disease_hog_v2",
+    }:
         classifier = model["classifier"]
         return {
             "status": "ready",
@@ -652,6 +661,7 @@ async def disease_status():
             "datasetImages": model["dataset_images"],
             "classCounts": model["class_counts"],
             "testAccuracy": model.get("test_accuracy") or model["validation_accuracy"],
+            "macroF1": model.get("macro_f1"),
         }
     return {
         "status": "ready",

@@ -52,11 +52,11 @@ Farmer accounts, farm profiles, image records, and activity history are stored i
 - Satellite NDVI: Sentinel Hub Sentinel-2 L2A point sample; configure `SENTINELHUB_CLIENT_ID` and `SENTINELHUB_CLIENT_SECRET`.
 - Mandi prices: the farmer dashboard links directly to the [Agmarknet visualization dashboard](https://visualize.data.gov.in/?inst=9ef84268-d588-465a-a308-a864a43d0070). In-app price results use the data.gov.in API and require `DATA_GOV_IN_API_KEY` and, if needed, `DATA_GOV_IN_MARKET_RESOURCE_ID`.
 - Weather threat alerts: current farm weather and a seven-day forecast from Open-Meteo are checked for configured heat, cold, strong-wind, and heavy-rain thresholds. Alerts refresh on dashboard load and every 15 minutes while open. These are weather indicators only, not pest/disease diagnoses or official emergency warnings.
-- Yield: low-confidence reference-range estimate, not a trained regional yield model.
+- Yield: regional yield estimate from the trained India crop-production model when available; this is historical and not a farm-level or weather-adjusted forecast. See [dataset and licensing notes](backend/data/README.md).
 
 External integrations remain unavailable until their provider credentials and subscriptions are configured. The application should not display fabricated live readings.
 
-## Download datasets and train both models
+## Download datasets and train models
 
 From the repository root, install the backend dependencies and download both datasets:
 
@@ -68,22 +68,24 @@ From the repository root, install the backend dependencies and download both dat
 The downloader prepares:
 
 - `backend/data/crop_recommendation.csv`: the 2,200-row crop recommendation dataset with N, P, K, temperature, humidity, pH, rainfall, and crop label columns. It prefers the Kaggle CLI if configured and otherwise uses a public Hugging Face CSV mirror.
+- `backend/data/india_crop_production.csv`: historical state/district/crop/season/area/production records used to derive yield in tonnes per hectare.
 - `backend/data/plantvillage_data.zip` and `backend/data/plant_disease/train/<Crop___Disease>/...` plus `test/<Crop___Disease>/...`: the PlantVillage color images (about 2.2 GB) arranged using the published train/test manifests.
 
 Train the crop recommendation model and disease image model:
 
 ```powershell
 .\\.venv\\Scripts\\python.exe backend\\scripts\\train_crop_model.py
+.\\.venv\\Scripts\\python.exe backend\\scripts\\train_yield_model.py
 .\\.venv\\Scripts\\python.exe backend\\scripts\\train_disease_model.py
 ```
 
-The crop trainer validates the eight required columns, requires at least 30 labelled rows and two crop classes, performs a stratified 80/20 hold-out split, reports validation accuracy, and writes `backend/models/crop_recommendation_model.joblib`. The disease trainer uses PlantVillage's published color train/test manifests (which preserve the dataset's leaf grouping), reports test accuracy and class counts, and writes `backend/models/plant_disease_model.joblib`. The app loads these models when available. The disease status endpoint distinguishes a real folder-trained model from its synthetic fallback.
+The crop trainer validates the eight required columns, requires at least 30 labelled rows and two crop classes, performs a stratified 80/20 hold-out split, reports validation accuracy, and writes `backend/models/crop_recommendation_model.joblib`. The yield trainer holds out the latest years, reports MAE, RMSE, R², and a within-25%-of-observed rate, and writes `backend/models/yield_prediction_model.joblib`. The disease trainer uses PlantVillage's published color train/test manifests (which preserve the dataset's leaf grouping), reports test accuracy and macro-F1, and writes `backend/models/plant_disease_model.joblib`. The app loads trained models when available. Generated model files are not tracked by Git; download the datasets and run the training scripts after cloning.
 
 Dataset and model binaries are excluded from Git to avoid committing a 2.2 GB image archive or generated model files. The download script and source/licence details are tracked in the repository; run the downloader after cloning. See [backend/data/README.md](backend/data/README.md).
 
-The PlantVillage dataset card declares CC BY-SA 3.0 and describes 54,306 images across 14 crop species and 26 diseases. Retain attribution and review share-alike terms before redistributing adapted data or models. The crop dataset mirror is downloaded for local use; check the original Kaggle dataset terms before redistribution or commercial use.
+The PlantVillage dataset card declares CC BY-SA 3.0 and describes 54,306 images across 14 crop species and 26 diseases. Retain attribution and review share-alike terms before redistributing adapted data or models. The yield dataset mirror marks its license unknown; check the original Kaggle terms before redistribution or commercial use.
 
-**Model limitations:** the crop dataset is a benchmark and does not guarantee crop suitability in a specific field. The current disease model uses compact colour/texture features and a Random Forest, not a field-validated diagnostic CNN. PlantVillage images are controlled research images; confirm suspected disease and treatment with a local agricultural expert.
+**Model limitations:** the crop recommendation dataset is a benchmark and does not guarantee crop suitability in a specific field. Yield estimates use regional historical production records, do not include weather, variety, soil, or farm-level observations, and report temporal holdout metrics for transparency. PlantVillage images are controlled research images; the disease classifier is not a field-validated CNN, and diagnoses should be confirmed by an agricultural expert.
 
 ## Tests
 
