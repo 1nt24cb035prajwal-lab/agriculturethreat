@@ -18,10 +18,11 @@ Open http://localhost:8000.
 Copy local provider settings:
 
 ```powershell
-copy backend\\.env.example backend\\.env
+copy backend\.env.example backend\.env
 ```
 
-The application automatically loads `backend/.env` at startup, so the normal Uvicorn command above is enough. 
+The application automatically loads `backend/.env` at startup, so the normal Uvicorn command above is enough. Never commit `.env` or paste provider secrets into source control.
+
 ## Google-only farmer authentication
 
 The farmer-facing sign-in uses Google OAuth. A first-time Google sign-in creates a farmer account after Google returns a verified email. Existing accounts are linked by verified email. After sign-in, the farmer fills in farm, crop, soil, and map-location details in the dashboard. Twilio OTP and phone-based passwords are not required for the sign-in flow.
