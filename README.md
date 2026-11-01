@@ -76,7 +76,7 @@ Train the crop recommendation model and disease image model:
 .\\.venv\\Scripts\\python.exe backend\\scripts\\train_disease_model.py
 ```
 
-The crop trainer validates the eight required columns, requires at least 30 labelled rows and two crop classes, performs a stratified 80/20 hold-out split, reports validation accuracy, and writes `backend/models/crop_recommendation_model.joblib`. The disease trainer reads labelled image subfolders, performs a stratified 80/20 hold-out split, reports validation accuracy and class counts, and writes `backend/models/plant_disease_model.joblib`. The app loads these models when available. The disease status endpoint distinguishes a real folder-trained model from its synthetic fallback.
+The crop trainer validates the eight required columns, requires at least 30 labelled rows and two crop classes, performs a stratified 80/20 hold-out split, reports validation accuracy, and writes `backend/models/crop_recommendation_model.joblib`. The disease trainer uses PlantVillage's published color train/test manifests (which preserve the dataset's leaf grouping), reports test accuracy and class counts, and writes `backend/models/plant_disease_model.joblib`. The app loads these models when available. The disease status endpoint distinguishes a real folder-trained model from its synthetic fallback.
 
 Dataset and model binaries are excluded from Git to avoid committing a 2.2 GB image archive or generated model files. The download script and source/licence details are tracked in the repository; run the downloader after cloning. See [backend/data/README.md](backend/data/README.md).
 
