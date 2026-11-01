@@ -208,6 +208,8 @@ class PlantDiseaseModel:
             "class_counts": class_counts,
             "validation_accuracy": accuracy,
             "validation_images": int(len(y_test)),
+            "test_accuracy": accuracy if split_strategy == "provided_train_test_split" else None,
+            "test_images": int(len(y_test)) if split_strategy == "provided_train_test_split" else None,
             "split_strategy": split_strategy,
         }
         joblib.dump(bundle, self.model_path)
@@ -260,9 +262,14 @@ class PlantDiseaseModel:
         loaded = self.load_or_train()
         if isinstance(loaded, dict) and loaded.get("kind") == "plant_disease_folders_v1":
             model = loaded["classifier"]
+            score_name = (
+                "test accuracy"
+                if loaded.get("split_strategy") == "provided_train_test_split"
+                else "validation accuracy"
+            )
             warning = (
                 f"Prototype image model trained on {loaded['dataset_images']} labelled images; "
-                f"held-out validation accuracy {loaded['validation_accuracy']:.1%}. "
+                f"held-out {score_name} {loaded['validation_accuracy']:.1%}. "
                 "This dataset score is not a field diagnosis; confirm with an agricultural expert."
             )
         else:
