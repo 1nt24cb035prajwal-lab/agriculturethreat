@@ -11,13 +11,17 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+# Load backend/.env even when the developer starts Uvicorn without --env-file.
+# Existing process/deployment variables always take precedence.
+load_dotenv(BASE_DIR / ".env", override=False)
 
 from . import database
 from . import integrations
 from . import advanced_services
 from .ml_model import CropRecommendationModel, PlantDiseaseModel
-
-BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_ENGINE = PlantDiseaseModel(BASE_DIR)
 CROP_MODEL_ENGINE = CropRecommendationModel(BASE_DIR)
 
@@ -132,25 +136,32 @@ async def verify_registration_otp(payload: dict):
 async def google_oauth_start(request: Request):
     status = advanced_services.configured_status()["googleOAuth"]
     if status != "configured":
-        raise HTTPException(status_code=503, detail="Google OAuth is not configured. Add Google OAuth client credentials.")
+        return RedirectResponse("/login?auth_error=google_not_configured", status_code=303)
     state = secrets.token_urlsafe(32)
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI") or str(request.url_for("google_oauth_callback"))
     params = {"client_id": os.environ["GOOGLE_CLIENT_ID"], "redirect_uri": redirect_uri, "response_type": "code", "scope": "openid email profile", "state": state, "prompt": "select_account"}
     response = RedirectResponse("https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params))
-    response.set_cookie("google_oauth_state", state, max_age=600, httponly=True, secure=os.getenv("COOKIE_SECURE", "false").lower() == "true", samesite="lax")
+    secure_cookie = request.url.scheme == "https" or os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    response.set_cookie("google_oauth_state", state, max_age=600, httponly=True, secure=secure_cookie, samesite="lax", path="/")
     return response
 
 
 @app.get("/auth/google/callback", name="google_oauth_callback")
-async def google_oauth_callback(request: Request, code: str | None = None, state: str | None = None):
+async def google_oauth_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+    if error:
+        return RedirectResponse("/login?auth_error=google_cancelled", status_code=303)
     expected_state = request.cookies.get("google_oauth_state")
     if not code or not state or not expected_state or not secrets.compare_digest(state, expected_state):
-        raise HTTPException(status_code=400, detail="Google sign-in state check failed. Please try again.")
+        response = RedirectResponse("/login?auth_error=google_state", status_code=303)
+        response.delete_cookie("google_oauth_state", path="/")
+        return response
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI") or str(request.url_for("google_oauth_callback"))
     try:
         profile = await advanced_services.exchange_google_code(code, redirect_uri)
     except advanced_services.ProviderUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        response = RedirectResponse("/login?auth_error=google_exchange", status_code=303)
+        response.delete_cookie("google_oauth_state", path="/")
+        return response
     google_sub = str(profile.get("sub") or "").strip()
     email = str(profile.get("email") or "").strip().lower()
     if not google_sub or not email:
