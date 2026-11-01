@@ -30,6 +30,112 @@ def _weather_code_description(code: int) -> str:
     return "Unknown conditions"
 
 
+def analyze_weather_threats(weather: dict) -> list[dict]:
+    current = weather.get("current") or {}
+    forecast = weather.get("forecast") or []
+    alerts = []
+
+    if current.get("condition") == "Thunderstorm":
+        alerts.append({
+            "type": "thunderstorm",
+            "severity": "high",
+            "title": "Thunderstorm conditions",
+            "detail": "A thunderstorm is reported at the farm location. Follow local warnings and avoid exposed field work.",
+        })
+
+    wind_speed = current.get("windSpeedKph")
+    if isinstance(wind_speed, (int, float)) and wind_speed >= 60:
+        alerts.append({
+            "type": "strong_wind",
+            "severity": "high",
+            "title": "Very strong wind",
+            "detail": f"Current wind is {wind_speed} km/h. Secure light structures and check exposed crops.",
+        })
+    elif isinstance(wind_speed, (int, float)) and wind_speed >= 40:
+        alerts.append({
+            "type": "strong_wind",
+            "severity": "medium",
+            "title": "Strong wind",
+            "detail": f"Current wind is {wind_speed} km/h. Monitor tall or exposed crops.",
+        })
+
+    temperatures = [
+        day.get("temperatureMaxC")
+        for day in forecast
+        if isinstance(day.get("temperatureMaxC"), (int, float))
+    ]
+    max_temperature = max(temperatures, default=None)
+    if max_temperature is not None and max_temperature >= 40:
+        alerts.append({
+            "type": "heat",
+            "severity": "high",
+            "title": "Very high temperature forecast",
+            "detail": f"A forecast high of {max_temperature}°C may increase crop heat stress. Check irrigation and local advisories.",
+        })
+    elif max_temperature is not None and max_temperature >= 35:
+        alerts.append({
+            "type": "heat",
+            "severity": "medium",
+            "title": "High temperature forecast",
+            "detail": f"A forecast high of {max_temperature}°C may increase crop heat stress. Monitor soil moisture.",
+        })
+
+    minimum_temperatures = [
+        day.get("temperatureMinC")
+        for day in forecast
+        if isinstance(day.get("temperatureMinC"), (int, float))
+    ]
+    min_temperature = min(minimum_temperatures, default=None)
+    if min_temperature is not None and min_temperature <= 0:
+        alerts.append({
+            "type": "cold",
+            "severity": "high",
+            "title": "Freezing temperature forecast",
+            "detail": f"A forecast low of {min_temperature}°C may damage sensitive crops. Check local crop-protection guidance.",
+        })
+    elif min_temperature is not None and min_temperature <= 3:
+        alerts.append({
+            "type": "cold",
+            "severity": "medium",
+            "title": "Low temperature forecast",
+            "detail": f"A forecast low of {min_temperature}°C may affect sensitive crops. Monitor local conditions.",
+        })
+
+    heavy_rain_days = [
+        day for day in forecast
+        if isinstance(day.get("rainProbabilityPercent"), (int, float))
+        and isinstance(day.get("rainfallMm"), (int, float))
+        and day["rainProbabilityPercent"] >= 70
+        and day["rainfallMm"] >= 50
+    ]
+    if heavy_rain_days:
+        day = max(heavy_rain_days, key=lambda item: item["rainfallMm"])
+        alerts.append({
+            "type": "heavy_rain",
+            "severity": "high",
+            "title": "Heavy rain forecast",
+            "detail": f"{day['rainfallMm']} mm of rain is forecast for {day.get('date', 'an upcoming day')} with a {day['rainProbabilityPercent']}% chance. Check drainage and local warnings.",
+        })
+    else:
+        rain_days = [
+            day for day in forecast
+            if isinstance(day.get("rainProbabilityPercent"), (int, float))
+            and isinstance(day.get("rainfallMm"), (int, float))
+            and day["rainProbabilityPercent"] >= 60
+            and day["rainfallMm"] >= 25
+        ]
+        if rain_days:
+            day = max(rain_days, key=lambda item: item["rainfallMm"])
+            alerts.append({
+                "type": "rain",
+                "severity": "medium",
+                "title": "Rain forecast",
+                "detail": f"{day['rainfallMm']} mm of rain is forecast for {day.get('date', 'an upcoming day')} with a {day['rainProbabilityPercent']}% chance. Plan field work accordingly.",
+            })
+
+    return alerts
+
+
 async def fetch_weather(latitude: float, longitude: float) -> dict:
     params = {
         "latitude": latitude,

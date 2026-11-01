@@ -529,7 +529,26 @@ async def get_market_prices(commodity: str | None = None, farmer: dict = Depends
 
 @app.get("/api/threats")
 async def get_threats(farmer: dict = Depends(require_farmer)):
-    integration_unavailable("Live threat analysis")
+    farm = database.get_farm(farmer["id"])
+    latitude = farm.get("latitude")
+    longitude = farm.get("longitude")
+    if latitude is None or longitude is None:
+        raise HTTPException(status_code=400, detail="Save a farm map location before requesting local threat alerts.")
+    try:
+        weather = await integrations.fetch_weather(float(latitude), float(longitude))
+    except integrations.ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    alerts = integrations.analyze_weather_threats(weather)
+    database.record_activity(farmer["id"], "weather_threat_lookup", {"alerts": len(alerts), "source": weather["source"]})
+    return {
+        "alerts": alerts,
+        "source": weather["source"],
+        "sourceUrl": weather.get("sourceUrl"),
+        "observedAt": weather.get("retrievedAt"),
+        "retrievedAt": weather.get("retrievedAt"),
+        "weather": weather,
+        "notice": "Weather-based indicators from current conditions and forecast only. This is not a pest, disease, or official emergency alert service.",
+    }
 
 
 @app.get("/api/admin")

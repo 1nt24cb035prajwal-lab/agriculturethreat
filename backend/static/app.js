@@ -24,6 +24,7 @@ let farmMap;
 let farmMarker;
 let weatherPreviewTimer;
 let dashboardData;
+let threatRefreshTimer;
 
 const api = {
   get: async (path) => {
@@ -77,7 +78,7 @@ const toneClassMap = {
   purple: 'purple'
 };
 
-const renderDashboard = (dashboard, weather = null, water = null) => {
+const renderDashboard = (dashboard, weather = null, water = null, threats = null) => {
   const { farmer, farm, integrations } = dashboard;
   welcomeMessage.textContent = dashboard.welcome;
   farmerProfileSummary.textContent = `${farmer.email} · ${farm.farmName || 'Farm details not yet saved'}`;
@@ -91,7 +92,7 @@ const renderDashboard = (dashboard, weather = null, water = null) => {
     { title: 'Water requirement', value: water ? `${water.dailyIrrigationLitersEstimate} L/day est.` : 'Unavailable', detail: water ? `${water.nextSevenDaysLitersEstimate} L / 7-day estimate` : 'Needs crop, area, and live ET0', tone: 'teal' },
     { title: 'Satellite / NDVI', value: integrations.satellite === 'configured' ? 'Sentinel Hub ready' : 'Needs credentials', detail: 'Sentinel-2 point sample', tone: 'blue' },
     { title: 'Market prices', value: integrations.marketPrices === 'configured' ? 'Agmarknet API ready' : 'Needs API key', detail: 'data.gov.in mandi arrivals', tone: 'purple' },
-    { title: 'Live threat alerts', value: 'Unavailable', detail: 'No verified live threat feed', tone: 'red' }
+    { title: 'Weather threat alerts', value: threats ? `${threats.alerts.length} Active` : farm.latitude == null ? 'Set farm location' : 'Loading...', detail: threats ? `Updated ${threats.retrievedAt || 'just now'} · weather indicators` : 'Uses current weather and forecast', tone: 'red' }
   ];
   dashboardCards.innerHTML = cards.map((card) => `
     <div class="stat-card ${toneClassMap[card.tone] || 'green'}">
@@ -101,10 +102,9 @@ const renderDashboard = (dashboard, weather = null, water = null) => {
     </div>
   `).join('');
 
-  renderWeatherForecast(weather);
   vegetationMap.innerHTML = '<p class="empty-state">Satellite imagery and NDVI are not connected. No vegetation measurement is available.</p>';
   growthChart.innerHTML = '<p class="empty-state">Yield history will appear after real or farmer-recorded yield data is saved.</p>';
-  threatList.innerHTML = '<p class="empty-state">No live threat feed is connected. This page will not invent risk alerts.</p>';
+  renderThreatAlerts(threats, farm.latitude != null && farm.longitude != null);
   recommendationSummary.innerHTML = `
     <div><strong>Farm:</strong> ${escapeHtml(farm.farmName || 'Not saved')}</div>
     <div><strong>Crop:</strong> ${escapeHtml(farm.cropName || 'Not set')}</div>
@@ -120,6 +120,41 @@ const renderDashboard = (dashboard, weather = null, water = null) => {
     <div><strong>Farm:</strong> ${escapeHtml(farm.farmName || 'Not saved')}</div>
     <div><strong>Location:</strong> ${escapeHtml(location)}</div>
   `;
+};
+
+const renderThreatAlerts = (threats, hasFarmLocation = true) => {
+  if (!threatList) return;
+  if (!threats) {
+    threatList.innerHTML = `<p class="empty-state">${hasFarmLocation ? 'Loading live weather-based indicators...' : 'Save a farm map location to load live weather-based indicators.'}</p>`;
+    return;
+  }
+  const threatCard = [...dashboardCards.children].find((card) => card.querySelector('h4')?.textContent === 'Weather threat alerts');
+  if (threatCard) {
+    threatCard.querySelector('.value').textContent = `${threats.alerts.length} Active`;
+    threatCard.querySelector('.detail').textContent = `Updated ${threats.retrievedAt || 'just now'} · weather indicators`;
+  }
+  if (threats.weather) {
+    renderWeatherForecast(threats.weather);
+    const weatherCard = [...dashboardCards.children].find((card) => card.querySelector('h4')?.textContent === 'Weather');
+    if (weatherCard) {
+      weatherCard.querySelector('.value').textContent = `${threats.weather.current.temperatureC}°C · ${threats.weather.current.condition}`;
+      weatherCard.querySelector('.detail').textContent = `${threats.weather.current.humidityPercent}% humidity · ${threats.weather.current.rainfallMm} mm rain`;
+    }
+  }
+  const alertItems = threats.alerts.length
+    ? threats.alerts.map((item) => `<div class="list-item"><strong>${escapeHtml(item.severity.toUpperCase())} · ${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p></div>`).join('')
+    : '<p class="empty-state">No configured weather alert thresholds were reached in the current conditions or forecast.</p>';
+  threatList.innerHTML = `${alertItems}<small class="data-source">${escapeHtml(threats.notice)} Source: ${escapeHtml(threats.source)} · Updated ${escapeHtml(threats.retrievedAt || '')}</small>`;
+};
+
+const showThreatAlertError = (error) => {
+  const message = error?.message || 'Unable to load weather-based alerts.';
+  threatList.textContent = message;
+  const threatCard = [...dashboardCards.children].find((card) => card.querySelector('h4')?.textContent === 'Weather threat alerts');
+  if (threatCard) {
+    threatCard.querySelector('.value').textContent = 'Unavailable';
+    threatCard.querySelector('.detail').textContent = message;
+  }
 };
 
 const renderWeatherForecast = (weather) => {
@@ -201,9 +236,11 @@ const showDashboard = async () => {
     authBox.classList.add('hidden');
     window.setTimeout(() => farmMap?.invalidateSize(), 60);
     const hasSavedCoordinates = dashboard.farm.latitude !== null && dashboard.farm.longitude !== null;
-    const hasWaterInputs = Boolean(dashboard.farm.cropName && dashboard.farm.landArea);
-    if (hasSavedCoordinates && hasWaterInputs) {
+    window.clearInterval(threatRefreshTimer);
+    threatRefreshTimer = undefined;
+    if (hasSavedCoordinates) {
       refreshDashboardFeeds(dashboard);
+      threatRefreshTimer = window.setInterval(() => refreshThreatAlerts(dashboard), 15 * 60 * 1000);
     }
   } catch (error) {
     alert('Unable to load dashboard data in demo mode.');
@@ -211,15 +248,36 @@ const showDashboard = async () => {
 };
 
 const refreshDashboardFeeds = async (dashboard) => {
-  const [weatherResult, waterResult] = await Promise.allSettled([api.get('/api/weather'), api.get('/api/water')]);
+  const requests = [
+    hasFarmWaterInputs(dashboard) ? api.get('/api/water') : Promise.resolve(null),
+    api.get('/api/threats')
+  ];
+  const [waterResult, threatsResult] = await Promise.allSettled(requests);
   if (dashboardData?.farmer?.id !== dashboard.farmer.id || dashboardSection.classList.contains('hidden')) {
     return;
   }
   renderDashboard(
     dashboard,
-    weatherResult.status === 'fulfilled' ? weatherResult.value : null,
-    waterResult.status === 'fulfilled' ? waterResult.value : null
+    threatsResult.status === 'fulfilled' ? threatsResult.value.weather : null,
+    waterResult.status === 'fulfilled' ? waterResult.value : null,
+    threatsResult.status === 'fulfilled' ? threatsResult.value : null
   );
+  if (threatsResult.status === 'rejected') showThreatAlertError(threatsResult.reason);
+};
+
+const hasFarmWaterInputs = (dashboard) => Boolean(dashboard.farm?.cropName && dashboard.farm?.landArea);
+
+const refreshThreatAlerts = async (dashboard) => {
+  try {
+    const result = await api.get('/api/threats');
+    if (dashboardData?.farmer?.id === dashboard.farmer.id && !dashboardSection.classList.contains('hidden')) {
+      renderThreatAlerts(result);
+    }
+  } catch (error) {
+    if (dashboardData?.farmer?.id === dashboard.farmer.id && !dashboardSection.classList.contains('hidden')) {
+      showThreatAlertError(error);
+    }
+  }
 };
 
 const routeTitles = {
@@ -230,7 +288,7 @@ const routeTitles = {
   weather: ['Open-Meteo', 'Weather Monitoring'],
   satellite: ['Provider unavailable', 'Satellite Vegetation'],
   yield: ['History only', 'Crop Yield'],
-  threats: ['Provider unavailable', 'Threat Information'],
+  threats: ['Open-Meteo indicators', 'Weather Threat Alerts'],
   history: ['Your account records', 'Activity History'],
   reports: ['Export saved records', 'Reports'],
   settings: ['Farmer account', 'Settings']
@@ -253,6 +311,8 @@ const renderCurrentPage = async () => {
   adminSection.classList.add('hidden');
 
   if (page === 'home' || page === 'login' || page === 'register') {
+    window.clearInterval(threatRefreshTimer);
+    threatRefreshTimer = undefined;
     dashboardSection.classList.add('hidden');
     authBox.classList.remove('hidden');
     document.title = page === 'home' ? 'Agriculture Threat Fusion' : `${page === 'login' ? 'Farmer Login' : 'Farmer Registration'} | Agriculture Threat Fusion`;
@@ -637,6 +697,19 @@ const logoutButton = document.getElementById('logoutButton');
 document.getElementById('googleLoginButton').addEventListener('click', () => { window.location.href = '/auth/google/start'; });
 document.getElementById('loadYieldButton').addEventListener('click', loadYieldEstimate);
 document.getElementById('loadMarketsButton').addEventListener('click', loadMarketPrices);
+document.getElementById('loadThreatsButton').addEventListener('click', async () => {
+  const button = document.getElementById('loadThreatsButton');
+  button.disabled = true;
+  threatList.textContent = 'Refreshing weather-based alerts...';
+  try {
+    const result = await api.get('/api/threats');
+    renderThreatAlerts(result);
+  } catch (error) {
+    showThreatAlertError(error);
+  } finally {
+    button.disabled = false;
+  }
+});
 document.getElementById('loadSatelliteButton').addEventListener('click', loadSatelliteNdvi);
 
 logoutButton.addEventListener('click', logout);

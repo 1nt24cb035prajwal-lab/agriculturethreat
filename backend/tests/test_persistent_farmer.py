@@ -102,6 +102,9 @@ def test_dashboard_is_farmer_scoped_and_unconfigured_feeds_are_not_fabricated():
     weather = client.get("/api/weather")
     assert weather.status_code == 400
     assert "map location" in weather.json()["detail"]
+    threats = client.get("/api/threats")
+    assert threats.status_code == 400
+    assert "map location" in threats.json()["detail"]
 
 
 def test_weather_and_location_providers_use_saved_coordinates_and_return_source_data():
@@ -133,13 +136,21 @@ def test_weather_and_location_providers_use_saved_coordinates_and_return_source_
     weather_data = {
         "source": "Open-Meteo",
         "retrievedAt": "2026-10-31T12:00",
-        "current": {"temperatureC": 27, "humidityPercent": 60, "rainfallMm": 0, "condition": "Clear sky"},
-        "forecast": [{"date": "2026-10-31", "condition": "Clear sky", "temperatureMinC": 20, "temperatureMaxC": 29, "rainProbabilityPercent": 10, "rainfallMm": 0}],
+        "current": {"temperatureC": 27, "humidityPercent": 60, "rainfallMm": 0, "windSpeedKph": 45, "condition": "Clear sky"},
+        "forecast": [{"date": "2026-10-31", "condition": "Clear sky", "temperatureMinC": 20, "temperatureMaxC": 41, "rainProbabilityPercent": 10, "rainfallMm": 0}],
     }
     with patch("backend.app.main.integrations.fetch_weather", new=AsyncMock(return_value=weather_data)) as provider:
         response = client.get("/api/weather")
     assert response.status_code == 200
     assert response.json()["source"] == "Open-Meteo"
+    provider.assert_awaited_once_with(12.3, 76.6)
+
+    with patch("backend.app.main.integrations.fetch_weather", new=AsyncMock(return_value=weather_data)) as provider:
+        response = client.get("/api/threats")
+    assert response.status_code == 200
+    assert {alert["type"] for alert in response.json()["alerts"]} == {"strong_wind", "heat"}
+    assert "not a pest" in response.json()["notice"]
+    assert response.json()["weather"]["current"]["windSpeedKph"] == 45
     provider.assert_awaited_once_with(12.3, 76.6)
 
     with patch("backend.app.main.integrations.fetch_weather", new=AsyncMock(return_value=weather_data)) as provider:

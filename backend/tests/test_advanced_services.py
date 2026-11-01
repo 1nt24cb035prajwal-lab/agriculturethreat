@@ -1,4 +1,5 @@
 from backend.app.advanced_services import configured_status, estimate_yield
+from backend.app.integrations import analyze_weather_threats
 
 
 def test_yield_estimate_scales_area_and_marks_low_confidence():
@@ -37,3 +38,24 @@ def test_provider_status_reports_missing_credentials_without_claiming_live_data(
     assert status["smsOtp"] == "disabled"
     assert status["sentinelHub"] in {"configured", "needs_credentials"}
     assert status["marketPrices"] in {"configured", "needs_api_key"}
+
+
+def test_weather_threat_analysis_reports_risks_from_live_weather_values():
+    alerts = analyze_weather_threats({
+        "current": {"windSpeedKph": 45, "condition": "Thunderstorm"},
+        "forecast": [
+            {"date": "2026-11-02", "temperatureMaxC": 41, "temperatureMinC": 2, "rainProbabilityPercent": 75, "rainfallMm": 55},
+        ],
+    })
+
+    assert {alert["type"] for alert in alerts} == {"thunderstorm", "strong_wind", "heat", "cold", "heavy_rain"}
+    assert all(alert["severity"] in {"medium", "high"} for alert in alerts)
+
+
+def test_weather_threat_analysis_returns_no_alerts_below_thresholds():
+    assert analyze_weather_threats({
+        "current": {"windSpeedKph": 10},
+        "forecast": [
+            {"temperatureMaxC": 25, "temperatureMinC": 10, "rainProbabilityPercent": 10, "rainfallMm": 0},
+        ],
+    }) == []
