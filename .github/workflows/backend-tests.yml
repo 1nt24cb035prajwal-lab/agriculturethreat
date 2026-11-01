@@ -3,7 +3,7 @@ name: Backend tests
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, fix/google-auth-and-real-datasets]
 
 jobs:
   test:

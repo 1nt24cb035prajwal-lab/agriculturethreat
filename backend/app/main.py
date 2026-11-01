@@ -11,13 +11,17 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from PIL import Image
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+# Load backend/.env even when the developer starts Uvicorn without --env-file.
+# Existing process/deployment variables always take precedence.
+load_dotenv(BASE_DIR / ".env", override=False)
 
 from . import database
 from . import integrations
 from . import advanced_services
 from .ml_model import CropRecommendationModel, PlantDiseaseModel
-
-BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_ENGINE = PlantDiseaseModel(BASE_DIR)
 CROP_MODEL_ENGINE = CropRecommendationModel(BASE_DIR)
 
@@ -132,25 +136,32 @@ async def verify_registration_otp(payload: dict):
 async def google_oauth_start(request: Request):
     status = advanced_services.configured_status()["googleOAuth"]
     if status != "configured":
-        raise HTTPException(status_code=503, detail="Google OAuth is not configured. Add Google OAuth client credentials.")
+        return RedirectResponse("/login?auth_error=google_not_configured", status_code=303)
     state = secrets.token_urlsafe(32)
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI") or str(request.url_for("google_oauth_callback"))
     params = {"client_id": os.environ["GOOGLE_CLIENT_ID"], "redirect_uri": redirect_uri, "response_type": "code", "scope": "openid email profile", "state": state, "prompt": "select_account"}
     response = RedirectResponse("https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params))
-    response.set_cookie("google_oauth_state", state, max_age=600, httponly=True, secure=os.getenv("COOKIE_SECURE", "false").lower() == "true", samesite="lax")
+    secure_cookie = request.url.scheme == "https" or os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    response.set_cookie("google_oauth_state", state, max_age=600, httponly=True, secure=secure_cookie, samesite="lax", path="/")
     return response
 
 
 @app.get("/auth/google/callback", name="google_oauth_callback")
-async def google_oauth_callback(request: Request, code: str | None = None, state: str | None = None):
+async def google_oauth_callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+    if error:
+        return RedirectResponse("/login?auth_error=google_cancelled", status_code=303)
     expected_state = request.cookies.get("google_oauth_state")
     if not code or not state or not expected_state or not secrets.compare_digest(state, expected_state):
-        raise HTTPException(status_code=400, detail="Google sign-in state check failed. Please try again.")
+        response = RedirectResponse("/login?auth_error=google_state", status_code=303)
+        response.delete_cookie("google_oauth_state", path="/")
+        return response
     redirect_uri = os.getenv("GOOGLE_REDIRECT_URI") or str(request.url_for("google_oauth_callback"))
     try:
         profile = await advanced_services.exchange_google_code(code, redirect_uri)
     except advanced_services.ProviderUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        response = RedirectResponse("/login?auth_error=google_exchange", status_code=303)
+        response.delete_cookie("google_oauth_state", path="/")
+        return response
     google_sub = str(profile.get("sub") or "").strip()
     email = str(profile.get("email") or "").strip().lower()
     if not google_sub or not email:
@@ -306,7 +317,10 @@ async def crop_recommendation(payload: dict, farmer: dict = Depends(require_farm
             "zone": recommendation["locationZone"],
         },
         "recommendation": recommendation,
-        "demoMode": True,
+        "demoMode": not (
+            isinstance(CROP_MODEL_ENGINE.model, dict)
+            and CROP_MODEL_ENGINE.model.get("kind") == "crop_csv_v1"
+        ),
         "datasetNotice": recommendation["datasetNotice"],
     }
 
@@ -580,10 +594,14 @@ async def analyze_disease(
             "disease_detection",
             {"imageId": image_id, "filename": file.filename, "cropName": result["cropName"], "cropStage": result["cropStage"], "predictedDisease": result["predictedDisease"], "confidencePct": result["confidencePct"]},
         )
+        trained_bundle = MODEL_ENGINE.model
         return {
             "message": "Disease analysis completed.",
             "result": result,
-            "demoMode": True,
+            "demoMode": not (
+                isinstance(trained_bundle, dict)
+                and trained_bundle.get("kind") == "plant_disease_folders_v1"
+            ),
         }
     except HTTPException:
         raise
@@ -606,10 +624,22 @@ async def get_disease_history_image(image_id: str, farmer: dict = Depends(requir
 @app.get("/api/disease/status")
 async def disease_status():
     model = MODEL_ENGINE.load_or_train()
+    if isinstance(model, dict) and model.get("kind") == "plant_disease_folders_v1":
+        classifier = model["classifier"]
+        return {
+            "status": "ready",
+            "classes": list(classifier.classes_),
+            "demoMode": False,
+            "datasetImages": model["dataset_images"],
+            "classCounts": model["class_counts"],
+            "testAccuracy": model.get("test_accuracy") or model["validation_accuracy"],
+        }
     return {
         "status": "ready",
         "classes": list(model.classes_),
         "demoMode": True,
+        "datasetImages": 0,
+        "notice": "Synthetic demonstration model only; download PlantVillage and train the real image-folder model.",
     }
 
 

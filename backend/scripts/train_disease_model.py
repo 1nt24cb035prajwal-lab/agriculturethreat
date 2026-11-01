@@ -17,8 +17,8 @@ def main() -> int:
         "dataset": str(dataset),
         "images": bundle["dataset_images"],
         "class_counts": bundle["class_counts"],
-        "validation_images": bundle["validation_images"],
-        "validation_accuracy": round(bundle["validation_accuracy"], 4),
+        "test_images": bundle.get("test_images") or bundle["validation_images"],
+        "test_accuracy": round(bundle.get("test_accuracy") or bundle["validation_accuracy"], 4),
         "model_path": str(model.model_path),
     }
     print(json.dumps(report, indent=2))
