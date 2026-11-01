@@ -12,4 +12,5 @@ dist/
 .DS_Store
 
 backend/models/
-backend/data/
+backend/data/*
+!backend/data/README.md
