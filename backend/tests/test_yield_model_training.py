@@ -15,7 +15,7 @@ def test_yield_model_trains_all_crops_and_evaluates_later_years(tmp_path: Path):
             for crop, base_yield in (("Rice", 4.0), ("Maize", 3.0)):
                 for index in range(30):
                     area = 1 + index % 8
-                    yield_per_hectare = base_yield + (year - 2010) * 0.1 + (index % 3) * 0.05
+                    yield_per_hectare = base_yield + (index % 3) * 0.05
                     writer.writerow([
                         "Karnataka",
                         "Mysuru" if index % 2 else "Mandya",
@@ -32,6 +32,7 @@ def test_yield_model_trains_all_crops_and_evaluates_later_years(tmp_path: Path):
     assert bundle["class_count"] == 2
     assert bundle["metrics"]["validationYears"][0] > bundle["validation_training_years"][1]
     assert bundle["metrics"]["validationRows"] > 0
+    assert bundle["metrics"]["validationOutlierRowsExcluded"] >= 0
     assert 0 <= bundle["metrics"]["within25PercentPercent"] <= 100
 
     prediction = model.predict({
@@ -48,6 +49,16 @@ def test_yield_model_trains_all_crops_and_evaluates_later_years(tmp_path: Path):
         abs=0.01,
     )
     assert prediction["modelMetrics"] == bundle["metrics"]
+
+    aliased_crop_prediction = model.predict({
+        "cropName": "Maize",
+        "state": "Karnataka",
+        "district": "Mysuru",
+        "season": "Kharif",
+        "landArea": 1,
+        "landAreaUnit": "Hectares",
+    })
+    assert aliased_crop_prediction["predictedYieldTonnesPerHectare"] > 0
 
     old_year_prediction = model.predict({
         "cropName": "Rice",

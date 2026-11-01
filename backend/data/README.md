@@ -20,7 +20,7 @@ The downloader prefers the Kaggle CLI if it is installed and authenticated; othe
 - Features: state, district, crop year, season, crop, area, and production. Yield is derived as production divided by area.
 - The mirror marks its license as unknown. Do not redistribute the CSV or trained model until the original dataset terms are reviewed.
 
-The yield trainer evaluates on later years that are excluded from training and reports MAE, RMSE, R², and the share of predictions within 25% of observed yield. It trains on all valid rows after the holdout evaluation, uses the 254 most common districts plus an "other" bucket, and retains all supported crop labels. This is regional historical data, not a farm-level yield benchmark.
+The yield trainer evaluates on later years that are excluded from training and reports MAE, RMSE, R², and the share of predictions within 25% of observed yield. It excludes validation targets above each crop's 99.5th-percentile yield calculated from training years only, and reports the number excluded. It trains on all valid rows after the holdout evaluation, uses the 254 most common districts plus an "other" bucket, and retains all supported crop labels. This is regional historical data, not a farm-level yield benchmark.
 
 ## Plant disease images
 
@@ -33,6 +33,8 @@ The yield trainer evaluates on later years that are excluded from training and r
 
 The downloader extracts only the RGB color images and uses the dataset's published `color_train.txt` and `color_test.txt` manifests. These splits preserve leaf grouping, avoiding the leakage that can occur when images of the same physical leaf are randomly split. Keep the attribution and share-alike terms with any redistributed adapted dataset or model; verify the source terms for your intended use.
 
+The trained `backend/models/plant_disease_model.joblib` artifact is included in this repository. It is an adaptation trained from PlantVillage and is distributed under CC BY-SA 3.0. Attribution: Mohanty, Hughes, and Salathé (2016), PlantVillage ([dataset card](https://huggingface.co/datasets/mohanty/PlantVillage)); see the [CC BY-SA 3.0 license](https://creativecommons.org/licenses/by-sa/3.0/).
+
 ## Train the models
 
 After the downloads and image preparation finish:
@@ -43,7 +45,7 @@ python backend\scripts\train_yield_model.py
 python backend\scripts\train_disease_model.py
 ```
 
-The resulting model files are written to `backend/models/`. They are deliberately excluded from Git because they are generated artifacts and may be large. Each developer or deployment should download the datasets and train locally, or store the model artifacts in an appropriate model registry.
+The resulting model files are written to `backend/models/`. The trained disease model is versioned with Git LFS; the other generated model files are excluded from Git. Each developer or deployment can download the datasets and train locally, or store model artifacts in an appropriate model registry.
 
 ## Important limitations
 

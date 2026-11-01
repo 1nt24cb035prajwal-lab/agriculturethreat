@@ -9,10 +9,18 @@ from typing import Any
 import joblib
 import numpy as np
 from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.metrics import mean_absolute_error, median_absolute_error, r2_score
 
 
 MAX_DISTRICT_CATEGORIES = 254
+CROP_ALIASES = {
+    "chili": "dry chillies",
+    "chilli": "dry chillies",
+    "cotton": "cotton(lint)",
+    "finger millet": "ragi",
+    "mustard": "rapeseed &mustard",
+    "soybean": "soyabean",
+}
 
 
 YIELD_DATASET_URL = (
@@ -132,6 +140,11 @@ class YieldPredictionModel:
             for crop, values in yields_by_crop.items()
             if len(values) >= 20
         }
+        validation_rows_total = len(validation_rows)
+        validation_rows = [
+            row for row in validation_rows
+            if row["yield"] <= upper_yield_by_crop.get(_normalize(row["crop"]), float("inf"))
+        ]
         train_rows = [
             row for row in train_rows
             if row["yield"] <= upper_yield_by_crop.get(_normalize(row["crop"]), float("inf"))
@@ -182,10 +195,13 @@ class YieldPredictionModel:
         absolute_percentage_error = np.abs(predicted_yield - y_validation) / y_validation
         model_metrics = {
             "maeTonnesPerHectare": round(float(mean_absolute_error(y_validation, predicted_yield)), 3),
+            "medianAbsoluteErrorTonnesPerHectare": round(float(median_absolute_error(y_validation, predicted_yield)), 3),
             "rmseTonnesPerHectare": round(float(np.sqrt(np.mean((y_validation - predicted_yield) ** 2))), 3),
             "r2": round(float(r2_score(y_validation, predicted_yield)), 4),
+            "medianAbsolutePercentageError": round(float(np.median(absolute_percentage_error) * 100), 2),
             "within25PercentPercent": round(float(np.mean(absolute_percentage_error <= 0.25) * 100), 2),
             "validationRows": len(validation_rows),
+            "validationOutlierRowsExcluded": validation_rows_total - len(validation_rows),
             "validationYears": [min(row["year"] for row in validation_rows), max(row["year"] for row in validation_rows)],
         }
         log_residual_interval = [
@@ -265,7 +281,7 @@ class YieldPredictionModel:
             raise FileNotFoundError("The trained India crop yield model is not available.")
         crop = str(farm.get("cropName") or "").strip()
         state = str(farm.get("state") or "").strip()
-        crop_key = _normalize(crop)
+        crop_key = CROP_ALIASES.get(_normalize(crop), _normalize(crop))
         state_key = _normalize(state)
         if crop_key not in bundle["category_maps"]["crop"]:
             raise ValueError(f"No yield training records are available for {crop or 'this crop'}.")

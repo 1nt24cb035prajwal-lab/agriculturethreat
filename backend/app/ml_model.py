@@ -138,7 +138,10 @@ class PlantDiseaseModel:
         return features.astype(np.float32)
 
     def _extract_plantvillage_features(self, image: Image.Image) -> np.ndarray:
-        rgb_image = image.convert("RGB").resize((64, 64), Image.Resampling.BILINEAR)
+        image_size = 32
+        cell_size = 8
+        cell_count = image_size // cell_size
+        rgb_image = image.convert("RGB").resize((image_size, image_size), Image.Resampling.BILINEAR)
         rgb = np.asarray(rgb_image, dtype=np.float32)
         gray = rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
         gradient_y, gradient_x = np.gradient(gray)
@@ -146,20 +149,21 @@ class PlantDiseaseModel:
         orientation = np.mod(np.arctan2(gradient_y, gradient_x), np.pi) * (9 / np.pi)
         lower_bin = np.floor(orientation).astype(np.int32) % 9
         bin_fraction = orientation - np.floor(orientation)
-        cell_rows, cell_columns = np.indices((64, 64))
-        cell_ids = ((cell_rows // 8) * 8 + cell_columns // 8).ravel()
+        cell_rows, cell_columns = np.indices((image_size, image_size))
+        cell_ids = ((cell_rows // cell_size) * cell_count + cell_columns // cell_size).ravel()
         magnitude = magnitude.ravel()
         lower_bin = lower_bin.ravel()
         bin_fraction = bin_fraction.ravel()
-        cell_histograms = np.zeros((64, 9), dtype=np.float32)
+        cell_total = cell_count * cell_count
+        cell_histograms = np.zeros((cell_total, 9), dtype=np.float32)
         for bin_index in range(9):
             lower_weights = magnitude * (1 - bin_fraction) * (lower_bin == bin_index)
             upper_weights = magnitude * bin_fraction * (((lower_bin + 1) % 9) == bin_index)
             cell_histograms[:, bin_index] = (
-                np.bincount(cell_ids, weights=lower_weights, minlength=64)
-                + np.bincount(cell_ids, weights=upper_weights, minlength=64)
+                np.bincount(cell_ids, weights=lower_weights, minlength=cell_total)
+                + np.bincount(cell_ids, weights=upper_weights, minlength=cell_total)
             )
-        cell_histograms = cell_histograms.reshape(8, 8, 9)
+        cell_histograms = cell_histograms.reshape(cell_count, cell_count, 9)
         cell_histograms /= np.maximum(
             np.linalg.norm(cell_histograms, axis=2, keepdims=True),
             1e-6,
@@ -170,11 +174,11 @@ class PlantDiseaseModel:
         for channel in range(3):
             color_histograms.extend(
                 np.histogram(rgb[:, :, channel], bins=16, range=(0, 256))[0].astype(np.float32)
-                / (64 * 64)
+                / (image_size * image_size)
             )
             color_histograms.extend(
                 np.histogram(hsv[:, :, channel], bins=16, range=(0, 256))[0].astype(np.float32)
-                / (64 * 64)
+                / (image_size * image_size)
             )
         return np.concatenate([cell_histograms.ravel(), color_histograms]).astype(np.float32)
 
@@ -236,11 +240,11 @@ class PlantDiseaseModel:
         classifier = SGDClassifier(
             loss="log_loss",
             alpha=0.0001,
-            max_iter=80,
+            max_iter=30,
             tol=0.001,
             random_state=42,
             class_weight="balanced",
-            n_jobs=-1,
+            n_jobs=1,
         )
         classifier.fit(X_train, y_train)
         predictions = classifier.predict(X_test)

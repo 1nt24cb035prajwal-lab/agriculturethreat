@@ -176,7 +176,7 @@ const loadYieldEstimate = async () => {
   try {
     const result = await api.get('/api/yield');
     const modelMetrics = result.modelMetrics
-      ? `<br><strong>Chronological holdout:</strong> MAE ${escapeHtml(result.modelMetrics.maeTonnesPerHectare)} t/ha · R² ${escapeHtml(result.modelMetrics.r2)}`
+      ? `<br><strong>Chronological holdout:</strong> MAE ${escapeHtml(result.modelMetrics.maeTonnesPerHectare)} t/ha · median percentage error ${escapeHtml(result.modelMetrics.medianAbsolutePercentageError)}% · within 25% ${escapeHtml(result.modelMetrics.within25PercentPercent)}%`
       : '';
     output.innerHTML = `<strong>Crop:</strong> ${escapeHtml(result.crop)}<br><strong>Expected estimate:</strong> ${escapeHtml(result.expectedEstimateTonnes)} tonnes<br><strong>Yield:</strong> ${escapeHtml(result.predictedYieldTonnesPerHectare ?? 'Reference range')} tonnes/ha<br><strong>Range:</strong> ${escapeHtml(result.lowEstimateTonnes)}–${escapeHtml(result.highEstimateTonnes)} tonnes<br><strong>Area:</strong> ${escapeHtml(result.areaHectares)} ha<br><strong>Confidence:</strong> ${escapeHtml(result.confidence)}${modelMetrics}<br><small>${escapeHtml(result.notice)}</small>`;
   } catch (error) { output.textContent = error.message; }
