@@ -632,7 +632,7 @@ async def disease_status():
             "demoMode": False,
             "datasetImages": model["dataset_images"],
             "classCounts": model["class_counts"],
-            "validationAccuracy": model["validation_accuracy"],
+            "testAccuracy": model.get("test_accuracy") or model["validation_accuracy"],
         }
     return {
         "status": "ready",
