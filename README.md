@@ -19,7 +19,7 @@ Open http://localhost:8000.
 
 The GitHub Pages URL is a static landing page and cannot run the FastAPI backend. Deploy the backend using the **Deploy the backend** button on the Pages site or open the [Render Blueprint deployment](https://render.com/deploy?repo=https://github.com/1nt24cb035prajwal-lab/agriculturethreat). Once the Render service `agriculture-threat-fusion` finishes deploying, the **Open the app** button on the Pages site opens the full application.
 
-The first Render deployment may need Google OAuth credentials configured in the Render service environment before Google sign-in will work. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` to the Render service's HTTPS callback URL (`https://agriculture-threat-fusion.onrender.com/auth/google/callback`), and add that callback URL to the Google OAuth client.
+The first Render deployment may need Google OAuth credentials configured in the Render service environment before Google sign-in will work. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` to the deployed backend callback URL (`https://agriculture-threat-fusion.onrender.com/auth/google/callback`) and add that exact URL to the Google OAuth client. The GitHub Pages URL (`https://1nt24cb035prajwal-lab.github.io/agriculturethreat/`) is only the landing page; it is not the OAuth redirect endpoint.
 
 Copy local provider settings:
 
