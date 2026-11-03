@@ -769,9 +769,9 @@ renderCurrentPage();
 
 // Show a useful explanation when Google redirects back with an authentication error.
 const googleAuthErrors = {
-  google_not_configured: 'Google sign-in is not configured yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to backend/.env, then restart the server.',
-  google_state: 'Google sign-in expired or the browser changed host during sign-in. Open http://localhost:8000 and try again.',
-  google_exchange: 'Google could not complete sign-in. Check that the OAuth client is a Web application and that its redirect URI exactly matches backend/.env.',
+  google_not_configured: 'Google sign-in is not configured on the server. In Render, open the agriculture-threat-fusion service Environment settings and set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, then restart the service.',
+  google_state: 'Google sign-in expired or the browser changed host during sign-in. Start again from https://agriculture-threat-fusion.onrender.com/ and allow cookies for this site.',
+  google_exchange: 'Google could not complete sign-in. Use a Google OAuth Web application client and set its authorized redirect URI to https://agriculture-threat-fusion.onrender.com/auth/google/callback. Check the client ID and secret in Render.',
   google_cancelled: 'Google sign-in was cancelled. Select your account and approve the sign-in request to continue.'
 };
 const googleAuthError = new URLSearchParams(window.location.search).get('auth_error');

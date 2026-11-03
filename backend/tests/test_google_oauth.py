@@ -1,3 +1,4 @@
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -6,18 +7,17 @@ from backend.app import advanced_services
 from backend.app.main import app
 
 
-client = TestClient(app)
-
-
 def test_google_sign_in_creates_new_farmer_account(monkeypatch):
     email = f"{uuid4().hex}@example.test"
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "test-client-id")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "test-client-secret")
-    monkeypatch.setenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
+    monkeypatch.setenv("GOOGLE_REDIRECT_URI", "https://agriculture-threat-fusion.onrender.com/auth/google/callback")
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    client = TestClient(app, base_url="https://agriculture-threat-fusion.onrender.com")
 
     async def fake_exchange_google_code(code: str, redirect_uri: str):
         assert code == "test-code"
-        assert redirect_uri == "http://localhost:8000/auth/google/callback"
+        assert redirect_uri == "https://agriculture-threat-fusion.onrender.com/auth/google/callback"
         return {
             "sub": f"google-{uuid4().hex}",
             "email": email,
@@ -29,6 +29,10 @@ def test_google_sign_in_creates_new_farmer_account(monkeypatch):
 
     start = client.get("/auth/google/start", follow_redirects=False)
     assert start.status_code == 307
+    authorization = parse_qs(urlsplit(start.headers["location"]).query)
+    assert authorization["client_id"] == ["test-client-id"]
+    assert authorization["redirect_uri"] == ["https://agriculture-threat-fusion.onrender.com/auth/google/callback"]
+    assert "Secure" in start.headers["set-cookie"]
     state = start.cookies["google_oauth_state"]
 
     callback = client.get(
