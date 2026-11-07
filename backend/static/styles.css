@@ -937,3 +937,22 @@ input {
     font-size: 2.4rem;
   }
 }
+
+
+/* Simple farmer name/phone/email and password authentication */
+.auth-content { padding: 30px; }
+.auth-content h2 { margin: 8px 0 10px; color: var(--forest); }
+.auth-heading { margin-bottom: 18px; }
+.auth-heading p { color: #536b5d; line-height: 1.55; }
+.auth-form { display: grid; gap: 14px; }
+.auth-form label { display: grid; gap: 7px; color: #294b39; font-size: 0.92rem; font-weight: 600; }
+.auth-form input:not([type="checkbox"]) {
+  width: 100%; padding: 12px 13px; border: 1px solid #d6e5da; border-radius: 10px;
+  background: #fbfffc; color: var(--text); outline: none;
+}
+.auth-form input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(47,143,91,.12); }
+.auth-form .terms-row { display: flex; align-items: flex-start; gap: 9px; font-weight: 500; }
+.auth-form .terms-row input { margin-top: 3px; }
+.auth-switch { margin: 4px 0 0; color: #536b5d; text-align: center; }
+.auth-switch a { color: var(--green); font-weight: 700; }
+.auth-form button:disabled { opacity: .65; cursor: wait; }
