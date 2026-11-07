@@ -90,6 +90,10 @@ def test_disease_analysis_accepts_crop_and_location_metadata():
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["result"]["predictedDisease"]
+    assert payload["result"]["diseaseName"]
+    assert payload["result"]["detectedCrop"]
+    assert payload["result"]["topPredictions"]
+    assert payload["demoMode"] is False
     assert payload["result"]["cropName"] == "Tomato"
     assert payload["result"]["cropStage"] == "Flowering"
     assert payload["result"]["location"]["district"] == "Coimbatore"
