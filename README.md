@@ -103,7 +103,7 @@ The disease classifier uses the PlantVillage RGB image benchmark and predicts cr
 To retrain after downloading the PlantVillage dataset, run:
 
 ```powershell
-python backend\scripts\download_datasets.py --disease-only
+python backend\scripts\download_datasets.py --skip-crop --skip-yield
 python backend\scripts\train_disease_model.py
 ```
 
