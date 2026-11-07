@@ -482,16 +482,45 @@ const analyzeDisease = async (event) => {
       throw new Error(result.detail || 'Disease analysis failed.');
     }
 
-    const { predictedDisease, confidencePct, severity, treatment, prevention, warning, cropName, location } = result.result;
+    const {
+      predictedDisease, confidencePct, severity, symptoms, treatment, prevention,
+      warning, cropName, cropStage, location, affectedCropParts = [],
+      nutrientDeficienciesToCheck = [], fertilizerRecommendations = [], nutrientNotice
+    } = result.result;
+    const deficiencyMarkup = nutrientDeficienciesToCheck.length
+      ? nutrientDeficienciesToCheck.map((item) => `
+          <article class="nutrient-card">
+            <strong>${escapeHtml(item.nutrient)}</strong>
+            <p>${escapeHtml(item.possibleSymptoms)}</p>
+            <small>Fertilizer sources: ${item.fertilizers.map(escapeHtml).join(', ')}</small>
+          </article>
+        `).join('')
+      : '<p>No crop-specific nutrient checklist is available. Ask an agricultural officer for a soil test.</p>';
     diseaseResult.innerHTML = `
-      <strong>Crop:</strong> ${escapeHtml(cropName)}<br>
-      <strong>Farm location:</strong> ${escapeHtml(location.village)}, ${escapeHtml(location.district)}, ${escapeHtml(location.state)} (${location.coordinates.latitude}, ${location.coordinates.longitude})<br>
-      <strong>Prediction:</strong> ${escapeHtml(predictedDisease)}<br>
-      <strong>Confidence:</strong> ${confidencePct}%<br>
-      <strong>Severity:</strong> ${escapeHtml(severity)}<br>
-      <strong>Recommended treatment:</strong> ${escapeHtml(treatment)}<br>
-      <strong>Prevention:</strong> ${escapeHtml(prevention)}<br>
-      <small>${escapeHtml(warning)}</small>
+      <div class="diagnosis-summary">
+        <strong>Crop:</strong> ${escapeHtml(cropName)} · <strong>Growth stage:</strong> ${escapeHtml(cropStage || 'Not provided')}<br>
+        <strong>Farm location:</strong> ${escapeHtml([location.village, location.district, location.state].filter(Boolean).join(', ') || 'Not provided')}<br>
+        <strong>Detected disease:</strong> ${escapeHtml(predictedDisease)}<br>
+        <strong>Model confidence:</strong> ${confidencePct}% · <strong>Severity:</strong> ${escapeHtml(severity)}
+      </div>
+      <section class="diagnosis-section">
+        <h3>Symptoms and affected plant parts</h3>
+        <p>${escapeHtml(symptoms || 'Compare the visible symptoms with the crop in the field.')}</p>
+        <p><strong>Parts to inspect:</strong> ${affectedCropParts.map(escapeHtml).join(', ') || 'Leaves and stems'}</p>
+      </section>
+      <section class="diagnosis-section">
+        <h3>Fertilizer names and nutrient deficiencies to check</h3>
+        <div class="nutrient-grid">${deficiencyMarkup}</div>
+        <p class="nutrient-notice">${escapeHtml(nutrientNotice || 'Confirm nutrient needs with a soil test before applying fertilizer.')}</p>
+        <p><strong>Fertilizer products to discuss with an agronomist:</strong> ${fertilizerRecommendations.map(escapeHtml).join(', ') || 'Based on soil test'}</p>
+      </section>
+      <section class="diagnosis-section">
+        <h3>Disease treatment</h3>
+        <p>${escapeHtml(treatment)}</p>
+        <h3>Prevention</h3>
+        <p>${escapeHtml(prevention)}</p>
+      </section>
+      <small class="diagnosis-warning">${escapeHtml(warning)} Fertilizers correct nutrient shortages; they do not cure fungal, bacterial, or viral diseases.</small>
     `;
     renderActivity((await api.get('/api/activity')).items);
   } catch (error) {
