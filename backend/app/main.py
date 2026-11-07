@@ -68,8 +68,6 @@ async def register_farmer(payload: dict, response: Response):
         raise HTTPException(status_code=400, detail="Accept the terms to create an account.")
 
     mobile = re.sub(r"[ ()-]", "", mobile)
-    if advanced_services.configured_status()["smsOtp"] == "configured" and not mobile.startswith("+"):
-        raise HTTPException(status_code=400, detail="Use international phone format including country code, such as +919876543210.")
 
     farm_profile = {
         "farmName": str(payload.get("farmName") or "").strip(),
