@@ -939,6 +939,18 @@ input {
 }
 
 
+/* Clear disease-class matches and expanded live weather forecast */
+.panel-title-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.weather-source-note { color:#5a7061; font-size:.88rem; margin:0 0 12px; }
+.forecast-item { display:grid; grid-template-columns:minmax(80px,.7fr) minmax(150px,1.4fr) minmax(130px,1fr); gap:10px; align-items:center; padding:12px 14px; border-bottom:1px solid #e5eee7; }
+.forecast-item small { display:block; color:#5b7162; grid-column:2 / -1; }
+.prediction-alternatives { margin-top:12px; padding:10px 12px; border-radius:10px; background:#f0f7f1; }
+.prediction-alternatives summary { cursor:pointer; color:var(--forest); font-weight:700; }
+.prediction-alternatives ol { margin:8px 0 0; padding-left:22px; }
+.prediction-alternatives li { padding:5px 0; }
+.prediction-alternatives li span { display:block; color:#5a7061; font-size:.86rem; }
+@media(max-width:650px) { .panel-title-row { align-items:flex-start; flex-direction:column; } .forecast-item { grid-template-columns:1fr; gap:4px; } .forecast-item small { grid-column:auto; } }
+
 /* Disease result: diagnosis, nutrient checklist, and fertilizer guidance */
 .diagnosis-summary, .diagnosis-section {
   padding: 16px; margin: 12px 0; border: 1px solid #dcebe0; border-radius: 13px; background: #fbfffc;
