@@ -939,6 +939,21 @@ input {
 }
 
 
+/* Disease result: diagnosis, nutrient checklist, and fertilizer guidance */
+.diagnosis-summary, .diagnosis-section {
+  padding: 16px; margin: 12px 0; border: 1px solid #dcebe0; border-radius: 13px; background: #fbfffc;
+}
+.diagnosis-section h3 { margin: 4px 0 10px; color: var(--forest); font-size: 1rem; }
+.diagnosis-section p { margin: 7px 0; line-height: 1.55; }
+.nutrient-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.nutrient-card { padding: 12px; border-radius: 10px; background: #eef8f0; border: 1px solid #d7e9dc; }
+.nutrient-card strong { color: var(--forest); }
+.nutrient-card p { font-size: .92rem; }
+.nutrient-card small, .nutrient-notice, .diagnosis-warning { color: #52685a; line-height: 1.5; }
+.nutrient-notice { padding: 10px; background: #fff8e8; border-radius: 8px; }
+.diagnosis-warning { display: block; margin: 12px 2px; }
+@media (max-width: 600px) { .nutrient-grid { grid-template-columns: 1fr; } }
+
 /* Simple farmer name/phone/email and password authentication */
 .auth-content { padding: 30px; }
 .auth-content h2 { margin: 8px 0 10px; color: var(--forest); }
