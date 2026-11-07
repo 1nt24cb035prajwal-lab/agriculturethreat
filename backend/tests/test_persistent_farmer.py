@@ -23,10 +23,14 @@ def test_farmer_account_and_farm_profile_persist_with_private_activity():
         },
     )
     assert registration.status_code == 201, registration.text
+    assert client.cookies.get("farmer_session"), "Registration should create a signed-in session."
 
+    client.cookies.clear()
     login = client.post("/api/auth/login", json={"mobile": mobile, "password": "CorrectHorseBattery!9"})
     assert login.status_code == 200, login.text
     assert client.cookies.get("farmer_session")
+    by_name = TestClient(app).post("/api/auth/login", json={"identifier": "Test Farmer", "password": "CorrectHorseBattery!9"})
+    assert by_name.status_code == 200, by_name.text
 
     saved = client.put(
         "/api/farm/profile",
@@ -224,7 +228,9 @@ def test_registration_rejects_duplicate_account_and_weak_password():
         "password": "CorrectHorseBattery!9",
         "termsAccepted": True,
     }
-    assert client.post("/api/auth/register", json=payload).status_code == 201
+    created = client.post("/api/auth/register", json=payload)
+    assert created.status_code == 201
+    assert created.cookies.get("farmer_session")
     assert client.post("/api/auth/register", json=payload).status_code == 409
     weak_payload = {**payload, "mobile": f"+1888{uuid4().int % 10_000_000:07d}", "password": "short"}
     assert client.post("/api/auth/register", json=weak_payload).status_code == 400

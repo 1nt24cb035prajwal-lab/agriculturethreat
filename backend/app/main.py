@@ -51,7 +51,7 @@ def require_farmer(request: Request) -> dict:
 
 
 @app.post("/api/auth/register", status_code=201)
-async def register_farmer(payload: dict):
+async def register_farmer(payload: dict, response: Response):
     full_name = str(payload.get("fullName") or "").strip()
     mobile = str(payload.get("mobile") or "").strip()
     email = str(payload.get("email") or "").strip().lower()
@@ -80,25 +80,20 @@ async def register_farmer(payload: dict):
         "latitude": None,
         "longitude": None,
     }
-    phone_verified = False
-    if advanced_services.configured_status()["smsOtp"] == "configured":
-        phone_verified = database.consume_phone_verification(mobile)
-        if not phone_verified:
-            raise HTTPException(status_code=400, detail="Verify this phone number with the OTP before creating your account.")
-
+    # Basic password registration does not depend on an external SMS/OTP provider.
+    # Phone verification can be added separately without blocking account creation.
     try:
         farmer = database.create_farmer(full_name, mobile, email, password, farm_profile)
-        if phone_verified:
-            database.set_farmer_phone_verified(int(farmer["id"].removeprefix("F-")))
-            farmer["phoneVerified"] = True
     except sqlite3.IntegrityError as exc:
         raise HTTPException(status_code=409, detail="That mobile number or email is already registered.") from exc
-    return {
-        "message": "Account created. Phone verification status is shown on your profile.",
-        "farmer": farmer,
-        "phoneVerified": bool(farmer.get("phoneVerified")),
-        "integrations": {"smsOtp": advanced_services.configured_status()["smsOtp"]},
-    }
+
+    session_token = database.create_session(int(farmer["id"].removeprefix("F-")))
+    response.set_cookie(
+        "farmer_session", session_token, max_age=database.SESSION_TTL_SECONDS,
+        httponly=True, secure=os.getenv("COOKIE_SECURE", "false").lower() == "true",
+        samesite="lax", path="/",
+    )
+    return {"message": "Account created successfully.", "farmer": farmer, "phoneVerified": False}
 
 
 @app.get("/api/integrations/status")
@@ -201,10 +196,10 @@ async def login_farmer(payload: dict, response: Response):
     password = str(payload.get("password") or "")
 
     if not identifier or not password:
-        raise HTTPException(status_code=401, detail="Invalid mobile number or password.")
+        raise HTTPException(status_code=401, detail="Enter your name, mobile number or email and password.")
     account = database.get_farmer_by_login(identifier)
     if not account or not database.verify_password(password, account["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid mobile/email or password.")
+        raise HTTPException(status_code=401, detail="Invalid name, mobile number, email or password.")
     session_token = database.create_session(account["id"])
     response.set_cookie(
         "farmer_session",

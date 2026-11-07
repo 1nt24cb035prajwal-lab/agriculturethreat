@@ -163,8 +163,8 @@ def link_google_account(farmer_id: int, google_sub: str) -> None:
 def get_farmer_by_login(identifier: str) -> sqlite3.Row | None:
     with connect() as connection:
         return connection.execute(
-            "SELECT * FROM farmers WHERE lower(email) = lower(?) OR mobile = ? LIMIT 1",
-            (identifier, identifier),
+            "SELECT * FROM farmers WHERE lower(email) = lower(?) OR mobile = ? OR lower(full_name) = lower(?) ORDER BY id ASC LIMIT 1",
+            (identifier, identifier, identifier),
         ).fetchone()
 
 

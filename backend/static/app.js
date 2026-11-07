@@ -1,6 +1,9 @@
 const dashboardSection = document.getElementById('dashboardSection');
 const adminSection = document.getElementById('adminSection');
 const authBox = document.getElementById('authBox');
+const loginForm = document.getElementById('loginForm');
+const registerForm = document.getElementById('registerForm');
+const authMessage = document.getElementById('authMessage');
 const welcomeMessage = document.getElementById('welcomeMessage');
 const farmerProfileSummary = document.getElementById('farmerProfileSummary');
 const dashboardCards = document.getElementById('dashboardCards');
@@ -318,7 +321,13 @@ const renderCurrentPage = async () => {
     threatRefreshTimer = undefined;
     dashboardSection.classList.add('hidden');
     authBox.classList.remove('hidden');
-    document.title = page === 'home' ? 'Agriculture Threat Fusion' : `${page === 'login' ? 'Farmer Login' : 'Farmer Registration'} | Agriculture Threat Fusion`;
+    if (loginForm && registerForm) {
+      loginForm.classList.toggle('hidden', page === 'register');
+      registerForm.classList.toggle('hidden', page !== 'register');
+      document.getElementById('authHeading').textContent = page === 'register' ? 'Create Farmer Account' : 'Farmer Login';
+      if (authMessage) authMessage.textContent = '';
+    }
+    document.title = page === 'home' ? 'Agriculture Threat Fusion' : `${page === 'register' ? 'Farmer Registration' : 'Farmer Login'} | Agriculture Threat Fusion`;
     return;
   }
 
@@ -697,7 +706,55 @@ const loginButton = document.getElementById('loginButton');
 const ctaSecondary = document.getElementById('ctaSecondary');
 const logoutButton = document.getElementById('logoutButton');
 
-document.getElementById('googleLoginButton').addEventListener('click', () => { window.location.href = '/auth/google/start'; });
+loginForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submitButton = loginForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  authMessage.textContent = 'Signing in...';
+  try {
+    const form = new FormData(loginForm);
+    await api.post('/api/auth/login', { identifier: form.get('identifier').trim(), password: form.get('password') });
+    navigateTo('/dashboard', true);
+  } catch (error) {
+    authMessage.textContent = error.message || 'Unable to log in. Check your details and try again.';
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+registerForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submitButton = registerForm.querySelector('button[type="submit"]');
+  const form = new FormData(registerForm);
+  const password = form.get('password');
+  if (password !== form.get('confirmPassword')) {
+    authMessage.textContent = 'Passwords do not match.';
+    return;
+  }
+  submitButton.disabled = true;
+  authMessage.textContent = 'Creating your farmer account...';
+  try {
+    await api.post('/api/auth/register', {
+      fullName: form.get('fullName').trim(),
+      mobile: form.get('mobile').trim(),
+      email: form.get('email').trim(),
+      password,
+      termsAccepted: form.get('termsAccepted') === 'on'
+    });
+    navigateTo('/dashboard', true);
+  } catch (error) {
+    authMessage.textContent = error.message || 'Unable to create your account. Please try again.';
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
+document.querySelectorAll('[data-auth-link]').forEach((link) => {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigateTo(link.getAttribute('href'));
+  });
+});
 document.getElementById('loadYieldButton').addEventListener('click', loadYieldEstimate);
 document.getElementById('loadMarketsButton').addEventListener('click', loadMarketPrices);
 document.getElementById('loadThreatsButton').addEventListener('click', async () => {
@@ -767,18 +824,3 @@ document.getElementById('downloadReportButton').addEventListener('click', async 
 renderCurrentPage();
 
 
-// Show a useful explanation when Google redirects back with an authentication error.
-const googleAuthErrors = {
-  google_not_configured: 'Google sign-in is not configured on the server. In Render, open the agriculture-threat-fusion service Environment settings and set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, then restart the service.',
-  google_state: 'Google sign-in expired or the browser changed host during sign-in. Start again from https://agriculture-threat-fusion.onrender.com/ and allow cookies for this site.',
-  google_exchange: 'Google could not complete sign-in. Use a Google OAuth Web application client and set its authorized redirect URI to https://agriculture-threat-fusion.onrender.com/auth/google/callback. Check the client ID and secret in Render.',
-  google_cancelled: 'Google sign-in was cancelled. Select your account and approve the sign-in request to continue.'
-};
-const googleAuthError = new URLSearchParams(window.location.search).get('auth_error');
-if (googleAuthError && googleAuthErrors[googleAuthError]) {
-  const message = document.createElement('p');
-  message.className = 'map-status';
-  message.setAttribute('role', 'alert');
-  message.textContent = googleAuthErrors[googleAuthError];
-  document.querySelector('.google-auth-content')?.append(message);
-}
