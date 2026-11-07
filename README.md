@@ -4,7 +4,12 @@ A full-stack agriculture monitoring prototype for farmer profiles, crop recommen
 
 ## Run locally
 
-From the repository root:
+On Windows, run `run_local.bat` from the repository root. It starts the
+FastAPI backend, waits for its health check, and opens the full app at
+http://localhost:8000. If dependencies are missing, install them as shown
+below.
+
+To start the backend manually from the repository root:
 
 ```powershell
 python -m venv .venv
@@ -14,6 +19,10 @@ python -m venv .venv
 ```
 
 Open http://localhost:8000.
+
+The repository-root `index.html` is a static GitHub Pages landing page, and
+`frontend/` is a separate Vite preview. Neither starts the full backend app;
+use the FastAPI command above (or `run_local.bat` on Windows).
 
 ## Public deployment
 
