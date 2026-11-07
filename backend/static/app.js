@@ -492,8 +492,10 @@ const analyzeDisease = async (event) => {
       ? topPredictions.map((item, index) => `<li><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.scorePct)}% model score</span></li>`).join('')
       : '<li>Alternative class scores unavailable.</li>';
     const cropMismatch = cropName && cropName !== 'Not provided' && detectedCrop
-      && cropName.toLowerCase().replace(/[^a-z]/g, '') !== detectedCrop.toLowerCase().replace(/[^a-z]/g, '')
-      && !(cropName.toLowerCase().includes('pepper') && detectedCrop === 'Bell Pepper');
+      && !(
+        ({ maize: 'corn', corn: 'corn', pepper: 'bellpepper', 'bell pepper': 'bellpepper' }[cropName.toLowerCase()] || cropName.toLowerCase().replace(/[^a-z]/g, ''))
+        === detectedCrop.toLowerCase().replace(/[^a-z]/g, '')
+      );
     const deficiencyMarkup = nutrientDeficienciesToCheck.length
       ? nutrientDeficienciesToCheck.map((item) => `
           <article class="nutrient-card">
