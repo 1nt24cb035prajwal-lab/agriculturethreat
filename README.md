@@ -28,13 +28,7 @@ use the FastAPI command above (or `run_local.bat` on Windows).
 
 The GitHub Pages URL is a static landing page and cannot run the FastAPI backend. Deploy the backend using the **Deploy the backend** button on the Pages site or open the [Render Blueprint deployment](https://render.com/deploy?repo=https://github.com/1nt24cb035prajwal-lab/agriculturethreat). Once the Render service `agriculture-threat-fusion` finishes deploying, the **Open the app** button on the Pages site opens the full application.
 
-Google sign-in requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the Render service environment. The Render Blueprint declares both as unsynced secrets; set them in the Render dashboard under **Environment**. `GOOGLE_REDIRECT_URI` is set by the Blueprint to `https://agriculture-threat-fusion.onrender.com/auth/google/callback`.
-
-In Google Cloud Console, use an OAuth 2.0 **Web application** client and add this exact URL under **Authorized redirect URIs**:
-
-`https://agriculture-threat-fusion.onrender.com/auth/google/callback`
-
-The GitHub Pages URL (`https://1nt24cb035prajwal-lab.github.io/agriculturethreat/`) is only the landing page; it is not the OAuth redirect endpoint. After configuring the credentials in Render, redeploy/restart the service and check `/api/health`; `integrations.googleOAuth` should report `configured`.
+The farmer app uses its own name/mobile/email and password authentication. Google OAuth credentials are not required. The GitHub Pages URL is a static landing page; deploy the FastAPI backend to Render for the full application.
 
 Copy local provider settings:
 
@@ -44,25 +38,11 @@ copy backend\.env.example backend\.env
 
 The application automatically loads `backend/.env` at startup, so the normal Uvicorn command above is enough. Never commit `.env` or paste provider secrets into source control.
 
-## Google-only farmer authentication
+## Farmer login and registration
 
-The farmer-facing sign-in uses Google OAuth. A first-time Google sign-in creates a farmer account after Google returns a verified email. Existing accounts are linked by verified email. After sign-in, the farmer fills in farm, crop, soil, and map-location details in the dashboard. Twilio OTP and phone-based passwords are not required for the sign-in flow.
+Farmers register with their full name, mobile number, email address, and password. After registration, the app creates a farmer record and signs the farmer in automatically. On later visits, farmers can log in using their full name, mobile number, or email address together with their password. Passwords are stored as salted PBKDF2-SHA256 hashes; plain-text passwords are never stored. Phone OTP is not required for basic account creation or login.
 
-In Google Cloud Console, create an OAuth 2.0 **Web application** client. Add these local values:
-
-- Authorized JavaScript origin: `http://localhost:8000`
-- Authorized redirect URI: `http://localhost:8000/auth/google/callback`
-
-Copy the client ID and secret into `backend/.env` and set:
-
-```dotenv
-GOOGLE_CLIENT_ID=your-client-id
-GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
-COOKIE_SECURE=false
-```
-
-Restart the server after changing `.env`, then open the app using exactly `http://localhost:8000` (do not switch to `127.0.0.1` during the Google redirect). If the OAuth consent screen is in Testing mode, add the Google account you are signing in with as a test user. Production deployments must use HTTPS and the exact production callback URI.
+Farmer accounts, farm profiles, sessions, and activity history are stored in SQLite. Render's default filesystem is ephemeral, so configure a persistent disk or move to a managed database before relying on long-term production records. Never commit passwords or provider secrets to Git.
 
 ## Farmer data and integrations
 
