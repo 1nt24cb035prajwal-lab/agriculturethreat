@@ -166,7 +166,8 @@ const renderWeatherForecast = (weather) => {
       <div class="forecast-item">
         <span>${escapeHtml(day.date)}</span>
         <strong>${escapeHtml(day.condition)} · ${escapeHtml(day.temperatureMinC)}–${escapeHtml(day.temperatureMaxC)}°C</strong>
-        <span>${escapeHtml(day.rainProbabilityPercent ?? '—')}% rain</span>
+        <span>${escapeHtml(day.rainProbabilityPercent ?? '—')}% rain · ${escapeHtml(day.rainfallMm ?? '—')} mm
+        <small>ET₀: ${escapeHtml(day.referenceEvapotranspirationMm ?? '—')} mm</small></span>
       </div>
     `).join('') + `<small class="data-source">Source: ${escapeHtml(weather.source)} · Updated ${escapeHtml(weather.retrievedAt)}</small>`
     : '<p class="empty-state">No live forecast is available for this saved farm location.</p>';
@@ -483,10 +484,18 @@ const analyzeDisease = async (event) => {
     }
 
     const {
-      predictedDisease, confidencePct, severity, symptoms, treatment, prevention,
-      warning, cropName, cropStage, location, affectedCropParts = [],
+      predictedDisease, diseaseName, detectedCrop, predictionStatus, confidencePct, severity, symptoms, treatment, prevention,
+      warning, cropName, cropStage, location, affectedCropParts = [], topPredictions = [], modelMetrics = {},
       nutrientDeficienciesToCheck = [], fertilizerRecommendations = [], nutrientNotice
     } = result.result;
+    const topPredictionMarkup = topPredictions.length
+      ? topPredictions.map((item, index) => `<li><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.scorePct)}% model score</span></li>`).join('')
+      : '<li>Alternative class scores unavailable.</li>';
+    const cropMismatch = cropName && cropName !== 'Not provided' && detectedCrop
+      && !(
+        ({ maize: 'corn', corn: 'corn', pepper: 'bellpepper', 'bell pepper': 'bellpepper' }[cropName.toLowerCase()] || cropName.toLowerCase().replace(/[^a-z]/g, ''))
+        === detectedCrop.toLowerCase().replace(/[^a-z]/g, '')
+      );
     const deficiencyMarkup = nutrientDeficienciesToCheck.length
       ? nutrientDeficienciesToCheck.map((item) => `
           <article class="nutrient-card">
@@ -501,7 +510,12 @@ const analyzeDisease = async (event) => {
         <strong>Crop:</strong> ${escapeHtml(cropName)} · <strong>Growth stage:</strong> ${escapeHtml(cropStage || 'Not provided')}<br>
         <strong>Farm location:</strong> ${escapeHtml([location.village, location.district, location.state].filter(Boolean).join(', ') || 'Not provided')}<br>
         <strong>Detected disease:</strong> ${escapeHtml(predictedDisease)}<br>
-        <strong>Model confidence:</strong> ${confidencePct}% · <strong>Severity:</strong> ${escapeHtml(severity)}
+        <strong>Model confidence:</strong> ${confidencePct}% · <strong>Severity:</strong> ${escapeHtml(severity)}<br>
+        <strong>Specific disease:</strong> ${escapeHtml(diseaseName || predictedDisease)}
+        ${cropMismatch ? `<p class="diagnosis-warning">Crop mismatch: your selected crop is ${escapeHtml(cropName)}, but the model's closest match is ${escapeHtml(detectedCrop)}. Please check the image and selected crop before using this result.</p>` : ''}
+        ${predictionStatus === 'low_confidence' ? '<p class="diagnosis-warning">Low-confidence result: upload a clearer close-up photo before relying on this prediction.</p>' : ''}
+        <details class="prediction-alternatives"><summary>View top 3 model matches</summary><ol>${topPredictionMarkup}</ol></details>
+        <small>Model evaluation: ${escapeHtml(modelMetrics.testAccuracyPct ?? '—')}% held-out test accuracy · ${escapeHtml(modelMetrics.macroF1Pct ?? '—')}% macro-F1 · ${escapeHtml(modelMetrics.datasetImages ?? '—')} training/test images.</small>
       </div>
       <section class="diagnosis-section">
         <h3>Symptoms and affected plant parts</h3>
@@ -786,6 +800,20 @@ document.querySelectorAll('[data-auth-link]').forEach((link) => {
 });
 document.getElementById('loadYieldButton').addEventListener('click', loadYieldEstimate);
 document.getElementById('loadMarketsButton').addEventListener('click', loadMarketPrices);
+document.getElementById('refreshWeatherButton').addEventListener('click', async () => {
+  const button = document.getElementById('refreshWeatherButton');
+  button.disabled = true;
+  weatherForecast.textContent = 'Refreshing live farm forecast...';
+  try {
+    const result = await api.get('/api/threats');
+    renderThreatAlerts(result);
+  } catch (error) {
+    weatherForecast.textContent = error.message || 'Unable to refresh the farm forecast.';
+  } finally {
+    button.disabled = false;
+  }
+});
+
 document.getElementById('loadThreatsButton').addEventListener('click', async () => {
   const button = document.getElementById('loadThreatsButton');
   button.disabled = true;

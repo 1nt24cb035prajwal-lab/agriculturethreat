@@ -25,5 +25,8 @@ def test_disease_model_trains_from_class_labelled_image_folders(tmp_path: Path):
     assert 0 <= bundle["macro_f1"] <= 1
     assert engine._extract_plantvillage_features(Image.new("RGB", (64, 64))).shape == (240,)
     prediction = engine.predict(Image.new("RGB", (64, 64), color=(50, 180, 50)))
-    assert prediction["predictedDisease"] in {"Healthy", "Tomato___Early_blight"}
+    assert prediction["detectedCrop"] in {"Unspecified crop", "Tomato"}
+    assert prediction["diseaseName"]
+    assert len(prediction["topPredictions"]) == 2
+    assert prediction["modelMetrics"]["datasetImages"] == 40
     assert "40 labelled images" in prediction["warning"]

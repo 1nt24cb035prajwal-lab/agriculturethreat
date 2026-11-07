@@ -20,7 +20,10 @@ def main() -> int:
         "test_images": bundle.get("test_images") or bundle["validation_images"],
         "test_accuracy": round(bundle["test_accuracy"] if bundle.get("test_accuracy") is not None else bundle["validation_accuracy"], 4),
         "macro_f1": round(bundle["macro_f1"], 4),
-        "model": "HOG + RGB/HSV histograms + SGD logistic classifier",
+        "class_count": len(bundle["classifier"].classes_),
+        "classes": list(bundle["classifier"].classes_),
+        "model": "PlantVillage HOG + RGB/HSV histograms + SGD logistic classifier",
+        "note": "Held-out PlantVillage metrics are benchmark results, not field diagnostic accuracy.",
         "model_path": str(model.model_path),
     }
     print(json.dumps(report, indent=2))

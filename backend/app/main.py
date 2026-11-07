@@ -619,11 +619,13 @@ async def analyze_disease(
             "result": result,
             "demoMode": not (
                 isinstance(trained_bundle, dict)
-                and trained_bundle.get("kind") == "plant_disease_folders_v1"
+                and trained_bundle.get("kind") == "plant_disease_hog_v2"
             ),
         }
     except HTTPException:
         raise
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Unable to process crop image: {str(exc)}") from exc
 
