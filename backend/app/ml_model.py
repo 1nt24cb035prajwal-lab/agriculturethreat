@@ -50,6 +50,75 @@ DISEASE_INFO = {
 }
 
 
+# Common crop nutrient issues to inspect in the field. These are screening clues,
+# not diagnoses inferred from a leaf-disease classifier.
+NUTRIENT_GUIDANCE = {
+    "nitrogen": {
+        "name": "Nitrogen (N)",
+        "symptoms": "Older leaves may turn pale green or yellow; growth can be stunted.",
+        "fertilizers": ["Urea", "Ammonium sulphate"],
+    },
+    "phosphorus": {
+        "name": "Phosphorus (P)",
+        "symptoms": "Plants may grow slowly; older leaves can look dark green or purplish.",
+        "fertilizers": ["DAP", "Single Super Phosphate (SSP)"],
+    },
+    "potassium": {
+        "name": "Potassium (K)",
+        "symptoms": "Older leaf edges may yellow, scorch, or become brown and dry.",
+        "fertilizers": ["Muriate of Potash (MOP)", "Sulphate of Potash (SOP)"],
+    },
+    "zinc": {
+        "name": "Zinc (Zn)",
+        "symptoms": "Interveinal yellowing, pale bands, or small leaves may appear; signs vary by crop.",
+        "fertilizers": ["Zinc sulphate (ZnSO4)"],
+    },
+    "iron": {
+        "name": "Iron (Fe)",
+        "symptoms": "Young leaves may yellow between veins while veins remain greener.",
+        "fertilizers": ["Ferrous sulphate"],
+    },
+    "magnesium": {
+        "name": "Magnesium (Mg)",
+        "symptoms": "Older leaves may show yellowing between veins while the veins remain green.",
+        "fertilizers": ["Magnesium sulphate (Epsom salt)"],
+    },
+    "calcium": {
+        "name": "Calcium (Ca)",
+        "symptoms": "New growth may deform; growing tips or fruit ends may show necrosis or blossom-end rot.",
+        "fertilizers": ["Agricultural lime (if soil pH is low)", "Gypsum (where calcium is needed without raising pH)"],
+    },
+    "boron": {
+        "name": "Boron (B)",
+        "symptoms": "Growing points, flowers, or young leaves may become distorted; fruit or pod set may be poor.",
+        "fertilizers": ["Borax or another locally approved boron source"],
+    },
+    "sulphur": {
+        "name": "Sulphur (S)",
+        "symptoms": "Young leaves may become uniformly pale yellow; growth and protein formation may be reduced.",
+        "fertilizers": ["Single Super Phosphate (SSP)", "Ammonium sulphate", "Gypsum"],
+    },
+}
+
+CROP_NUTRIENT_CHECKS = {
+    "rice": ["nitrogen", "zinc", "potassium"],
+    "paddy": ["nitrogen", "zinc", "potassium"],
+    "maize": ["nitrogen", "zinc", "phosphorus"],
+    "corn": ["nitrogen", "zinc", "phosphorus"],
+    "wheat": ["nitrogen", "zinc", "potassium"],
+    "tomato": ["potassium", "calcium", "magnesium", "nitrogen"],
+    "potato": ["potassium", "magnesium", "nitrogen"],
+    "cotton": ["nitrogen", "potassium", "zinc"],
+    "groundnut": ["calcium", "sulphur", "boron"],
+    "sugarcane": ["nitrogen", "potassium", "zinc"],
+    "chili": ["potassium", "calcium", "magnesium"],
+    "chilli": ["potassium", "calcium", "magnesium"],
+    "banana": ["potassium", "magnesium", "nitrogen"],
+    "onion": ["nitrogen", "sulphur", "potassium"],
+    "grape": ["potassium", "magnesium", "boron"],
+    "apple": ["potassium", "calcium", "boron"],
+}
+
 CROP_RECOMMENDATION_DATA = [
     {"crop": "Rice", "state": "Karnataka", "district": "Mysuru", "soilType": "Black Soil", "season": "Kharif", "temperature": 29, "humidity": 74, "rainfall": 1200, "latitude": 12.3, "longitude": 76.6},
     {"crop": "Rice", "state": "Tamil Nadu", "district": "Thanjavur", "soilType": "Clay Loam", "season": "Kharif", "temperature": 31, "humidity": 72, "rainfall": 1100, "latitude": 10.8, "longitude": 79.1},
@@ -323,6 +392,31 @@ class PlantDiseaseModel:
                 return self.model
             self.model = None
         return self.train()
+
+    @staticmethod
+    def nutrient_guidance(crop_name: str | None) -> dict:
+        crop_key = str(crop_name or "").strip().lower()
+        keys = CROP_NUTRIENT_CHECKS.get(crop_key, ["nitrogen", "phosphorus", "potassium", "zinc"])
+        items = []
+        fertilizer_names = []
+        for key in keys:
+            item = NUTRIENT_GUIDANCE.get(key)
+            if not item:
+                continue
+            items.append({
+                "nutrient": item["name"],
+                "possibleSymptoms": item["symptoms"],
+                "fertilizers": item["fertilizers"],
+            })
+            fertilizer_names.extend(item["fertilizers"])
+        return {
+            "nutrientDeficienciesToCheck": items,
+            "fertilizerRecommendations": list(dict.fromkeys(fertilizer_names)),
+            "nutrientNotice": (
+                "These are common nutrient issues to inspect for this crop, not deficiencies diagnosed from this photo. "
+                "Confirm with a soil or plant-tissue test and local agricultural advice before applying fertilizer."
+            ),
+        }
 
     def predict(self, image: Image.Image):
         loaded = self.load_or_train()
