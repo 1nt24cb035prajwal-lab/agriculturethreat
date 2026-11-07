@@ -93,6 +93,11 @@ NUTRIENT_GUIDANCE = {
         "symptoms": "Growing points, flowers, or young leaves may become distorted; fruit or pod set may be poor.",
         "fertilizers": ["Borax or another locally approved boron source"],
     },
+    "sulphur": {
+        "name": "Sulphur (S)",
+        "symptoms": "Young leaves may become uniformly pale yellow; growth and protein formation may be reduced.",
+        "fertilizers": ["Single Super Phosphate (SSP)", "Ammonium sulphate", "Gypsum"],
+    },
 }
 
 CROP_NUTRIENT_CHECKS = {
