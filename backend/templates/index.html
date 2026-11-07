@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="/static/styles.css?v=20261108" />
+    <link rel="stylesheet" href="/static/styles.css?v=20261109" />
   </head>
   <body>
     <div class="page-shell">
@@ -88,7 +88,7 @@
             <h2>Powerful features for safer farming</h2>
           </div>
           <div class="feature-grid">
-            <article class="feature-card"><span>🩺</span><h3>Crop Image Review</h3><p>Upload or capture an image for a synthetic-data prototype classification. Confirm results with an agricultural expert.</p></article>
+            <article class="feature-card"><span>🩺</span><h3>Specific Crop Disease Detection</h3><p>PlantVillage image classifier identifies 38 crop-and-disease classes, with symptoms, top matches, and cautious treatment guidance.</p></article>
             <article class="feature-card"><span>⛅</span><h3>Weather Monitoring</h3><p>Current conditions and a seven-day forecast use Open-Meteo for the saved farm coordinates.</p></article>
             <article class="feature-card"><span>🛰️</span><h3>Satellite Vegetation</h3><p>Satellite imagery and NDVI are unavailable until a provider is configured.</p></article>
             <article class="feature-card"><span>💧</span><h3>Water Planning</h3><p>Save irrigation and soil details with the farm profile; validated sensor and evapotranspiration data are not connected.</p></article>
@@ -181,7 +181,8 @@
 
           <div class="two-col-layout">
             <div class="panel" data-feature-view="weather">
-              <div class="panel-title">Weather Forecast</div>
+              <div class="panel-title-row"><div class="panel-title">Live 7-Day Farm Weather Forecast</div><button class="secondary-btn" id="refreshWeatherButton" type="button">Refresh forecast</button></div>
+              <p class="weather-source-note">Temperature, rain probability, expected rainfall, and reference evapotranspiration for your saved farm coordinates.</p>
               <div id="weatherForecast" class="forecast-list"></div>
             </div>
             <div class="panel" data-feature-view="satellite">
@@ -351,6 +352,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="/static/app.js?v=20261108"></script>
+    <script src="/static/app.js?v=20261109"></script>
   </body>
 </html>
