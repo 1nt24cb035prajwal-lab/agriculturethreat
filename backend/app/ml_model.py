@@ -69,7 +69,7 @@ DISEASE_CLASS_INFO = {
     "northern_leaf_blight": ("Northern Leaf Blight", "Long, cigar-shaped grey-green to tan lesions develop along maize leaves.", "Use resistant hybrids, rotate crops, manage infected residue, and seek local disease-management advice.", "High"),
     "esca_black_measles": ("Esca (Black Measles)", "Grapevine leaves may show tiger-stripe discoloration; berries can develop dark specks and vines may decline.", "Prune in dry weather, protect pruning wounds using locally recommended methods, remove severely affected wood, and seek vineyard specialist advice.", "High"),
     "leaf_blight_isariopsis_leaf_spot": ("Isariopsis Leaf Blight", "Grape leaves can develop angular brown lesions that enlarge and cause premature leaf drop.", "Remove infected fallen leaves, improve canopy airflow, avoid prolonged leaf wetness, and confirm control options locally.", "Moderate"),
-    "huanglongbing_citrus_greening": ("Citrus Greening (Huanglongbing / HLB)", "Blotchy asymmetric leaf yellowing, yellow shoots, small lopsided fruit, and poor fruit color may occur.", "There is no curative treatment for infected trees. Use certified planting material, monitor and manage citrus psyllids under local guidance, and follow official removal advice.", "High"),
+    "haunglongbing_citrus_greening": ("Citrus Greening (Huanglongbing / HLB)", "Blotchy asymmetric leaf yellowing, yellow shoots, small lopsided fruit, and poor fruit color may occur.", "There is no curative treatment for infected trees. Use certified planting material, monitor and manage citrus psyllids under local guidance, and follow official removal advice.", "High"),
     "bacterial_spot": ("Bacterial Spot", "Small water-soaked spots can become dark, angular or shot-holed; fruit may show raised scabby lesions.", "Use clean certified seed or transplants, avoid handling wet plants, remove infected residue, and ask an extension officer about locally registered bacterial-spot management.", "Moderate"),
     "early_blight": ("Early Blight", "Brown leaf spots with concentric target-like rings often begin on older leaves; yellowing and leaf drop can follow.", "Remove lower infected leaves, rotate away from solanaceous crops, mulch to reduce soil splash, and confirm local fungicide advice.", "Moderate"),
     "late_blight": ("Late Blight", "Water-soaked, rapidly expanding dark lesions may appear; white growth can form on leaf undersides in humid conditions.", "Act quickly: isolate affected plants, avoid overhead irrigation, remove infected material safely, and contact local extension staff urgently about registered late-blight control.", "High"),
@@ -478,7 +478,7 @@ class PlantDiseaseModel:
         parts = raw_label.split("___", 1)
         crop_key = parts[0] if len(parts) == 2 else ""
         disease_key = parts[1] if len(parts) == 2 else raw_label
-        detected_crop = PLANT_DISEASE_CROPS.get(crop_key, crop_key.replace("_", " ").replace(",", "").title())
+        detected_crop = PLANT_DISEASE_CROPS.get(crop_key, crop_key.replace("_", " ").replace(",", "").title()) if crop_key else "Unspecified crop"
         disease_slug = disease_key.lower().replace(" ", "_").replace("-", "_").strip("_")
         disease_info = DISEASE_CLASS_INFO.get(disease_slug)
         if disease_info is None:
@@ -489,7 +489,7 @@ class PlantDiseaseModel:
             severity = "Needs expert review"
         else:
             display_disease, symptoms, treatment, severity = disease_info
-            prevention = treatment
+            prevention = "Use disease-free planting material, rotate crops where practical, remove infected crop debris, avoid prolonged leaf wetness, and scout the crop regularly."
         healthy = disease_slug == "healthy"
         display_label = f"{detected_crop} — {display_disease}"
         top_predictions = []
