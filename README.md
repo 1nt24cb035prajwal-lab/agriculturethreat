@@ -95,3 +95,16 @@ The PlantVillage dataset card declares CC BY-SA 3.0 and describes 54,306 images 
 ```
 
 The GitHub Actions workflow runs the backend regression tests on pull requests.
+
+## Disease detection and weather forecast
+
+The disease classifier uses the PlantVillage RGB image benchmark and predicts crop-specific classes (38 labels across 14 crop species). The checked-in trained model reports 54,305 labelled images, 10,709 held-out test images, 76.9% held-out accuracy, and 71.8% macro-F1. These are controlled-dataset metrics, not guaranteed field accuracy. The app displays the crop/disease class, top model matches, symptoms, and conservative integrated pest-management guidance. If the trained model is unavailable, the app does not silently substitute synthetic predictions.
+
+To retrain after downloading the PlantVillage dataset, run:
+
+```powershell
+python backend\scripts\download_datasets.py --disease-only
+python backend\scripts\train_disease_model.py
+```
+
+The farm dashboard retrieves a live seven-day Open-Meteo forecast for saved farm coordinates, including temperature, rainfall probability, rainfall totals, and FAO reference evapotranspiration. It refreshes automatically every 15 minutes and can be refreshed manually.
