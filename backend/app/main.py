@@ -590,6 +590,7 @@ async def analyze_disease(
         result = MODEL_ENGINE.predict(image)
         farm = database.get_farm(farmer["id"])
         result["cropName"] = cropName or farm.get("cropName") or "Not provided"
+        result.update(MODEL_ENGINE.nutrient_guidance(result["cropName"]))
         result["cropStage"] = cropStage or farm.get("cropStage") or "Not provided"
         result["location"] = {
             "state": state or farm.get("state") or "",
