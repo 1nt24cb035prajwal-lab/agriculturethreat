@@ -50,6 +50,39 @@ DISEASE_INFO = {
 }
 
 
+# PlantVillage labels are crop-specific. Keep the raw dataset label for traceability,
+# but return readable disease names and actionable, conservative IPM guidance.
+PLANT_DISEASE_CROPS = {
+    "Apple": "Apple", "Blueberry": "Blueberry", "Cherry_(including_sour)": "Cherry",
+    "Corn_(maize)": "Corn", "Grape": "Grape", "Orange": "Orange", "Peach": "Peach",
+    "Pepper,_bell": "Bell Pepper", "Potato": "Potato", "Raspberry": "Raspberry",
+    "Soybean": "Soybean", "Squash": "Squash", "Strawberry": "Strawberry", "Tomato": "Tomato",
+}
+DISEASE_CLASS_INFO = {
+    "healthy": ("Healthy", "No disease pattern was identified in this image. Continue scouting; a healthy-looking leaf does not rule out other plant problems.", "Keep using clean seed or planting material, balanced nutrition, and regular field scouting.", "Low"),
+    "apple_scab": ("Apple Scab", "Olive-green to dark, velvety spots can develop on leaves and fruit; infected leaves may distort or drop.", "Remove fallen infected leaves, prune for airflow, and ask local horticulture staff about locally registered scab-control products at the correct growth stage.", "Moderate"),
+    "black_rot": ("Black Rot", "Dark circular leaf lesions and fruit rot may occur; on grapes, berries can shrivel into dark mummies.", "Remove mummified fruit and infected debris, prune for airflow, and use locally approved disease management only after confirmation.", "High"),
+    "cedar_apple_rust": ("Cedar-Apple Rust", "Bright orange-yellow leaf spots may develop, sometimes with tube-like structures on the leaf underside.", "Remove nearby alternate-host junipers where practical and use resistant apple varieties; confirm local control timing with an extension officer.", "Moderate"),
+    "powdery_mildew": ("Powdery Mildew", "White powder-like fungal growth may appear on leaf surfaces; leaves can curl or become stunted.", "Improve airflow, remove heavily affected leaves, avoid excessive nitrogen, and use a locally registered mildew treatment only as advised.", "Moderate"),
+    "cercospora_leaf_spot_gray_leaf_spot": ("Cercospora / Gray Leaf Spot", "Rectangular grey-tan lesions bounded by leaf veins can expand and merge on maize leaves.", "Use resistant hybrids, rotate crops, manage infected residue, and consult local agronomy advice on fungicide need.", "Moderate"),
+    "common_rust": ("Common Rust", "Small raised cinnamon-brown to dark rust pustules occur on both leaf surfaces.", "Grow resistant hybrids, scout early, and seek local advice on fungicide timing when disease pressure is high.", "Moderate"),
+    "northern_leaf_blight": ("Northern Leaf Blight", "Long, cigar-shaped grey-green to tan lesions develop along maize leaves.", "Use resistant hybrids, rotate crops, manage infected residue, and seek local disease-management advice.", "High"),
+    "esca_black_measles": ("Esca (Black Measles)", "Grapevine leaves may show tiger-stripe discoloration; berries can develop dark specks and vines may decline.", "Prune in dry weather, protect pruning wounds using locally recommended methods, remove severely affected wood, and seek vineyard specialist advice.", "High"),
+    "leaf_blight_isariopsis_leaf_spot": ("Isariopsis Leaf Blight", "Grape leaves can develop angular brown lesions that enlarge and cause premature leaf drop.", "Remove infected fallen leaves, improve canopy airflow, avoid prolonged leaf wetness, and confirm control options locally.", "Moderate"),
+    "huanglongbing_citrus_greening": ("Citrus Greening (Huanglongbing / HLB)", "Blotchy asymmetric leaf yellowing, yellow shoots, small lopsided fruit, and poor fruit color may occur.", "There is no curative treatment for infected trees. Use certified planting material, monitor and manage citrus psyllids under local guidance, and follow official removal advice.", "High"),
+    "bacterial_spot": ("Bacterial Spot", "Small water-soaked spots can become dark, angular or shot-holed; fruit may show raised scabby lesions.", "Use clean certified seed or transplants, avoid handling wet plants, remove infected residue, and ask an extension officer about locally registered bacterial-spot management.", "Moderate"),
+    "early_blight": ("Early Blight", "Brown leaf spots with concentric target-like rings often begin on older leaves; yellowing and leaf drop can follow.", "Remove lower infected leaves, rotate away from solanaceous crops, mulch to reduce soil splash, and confirm local fungicide advice.", "Moderate"),
+    "late_blight": ("Late Blight", "Water-soaked, rapidly expanding dark lesions may appear; white growth can form on leaf undersides in humid conditions.", "Act quickly: isolate affected plants, avoid overhead irrigation, remove infected material safely, and contact local extension staff urgently about registered late-blight control.", "High"),
+    "leaf_mold": ("Leaf Mold", "Pale yellow patches on upper leaves may correspond to olive-green or grey fuzzy growth underneath, especially in humid conditions.", "Improve ventilation, avoid wet foliage, remove affected leaves, and use resistant varieties where available.", "Moderate"),
+    "septoria_leaf_spot": ("Septoria Leaf Spot", "Numerous small circular spots with pale centres and dark margins can spread from older tomato leaves upward.", "Remove infected lower leaves, rotate crops, mulch against soil splash, and maintain dry foliage.", "Moderate"),
+    "spider_mites_two_spotted_spider_mite": ("Two-Spotted Spider Mite", "Fine pale stippling, bronzing, and sometimes fine webbing can appear on leaf undersides.", "Inspect leaf undersides, reduce dust and plant stress, conserve predatory mites, and use only locally approved mite controls if thresholds justify it.", "Moderate"),
+    "target_spot": ("Target Spot", "Brown circular lesions with concentric rings may appear on leaves and can cause defoliation.", "Improve airflow, avoid prolonged leaf wetness, remove infected debris, and confirm diagnosis before applying a locally registered fungicide.", "Moderate"),
+    "tomato_yellow_leaf_curl_virus": ("Tomato Yellow Leaf Curl Virus", "Leaves may curl upward, turn yellow, become small, and show stunted growth; whiteflies commonly spread the virus.", "Remove confirmed infected plants, use virus-free transplants and resistant varieties, and manage whiteflies through integrated pest management. There is no cure for infected plants.", "High"),
+    "tomato_mosaic_virus": ("Tomato Mosaic Virus", "Light and dark green mottling, leaf distortion, and stunted growth may occur.", "Remove confirmed infected plants, disinfect tools and hands, use certified seed, and control weeds that can host the virus. There is no curative spray.", "High"),
+    "leaf_scorch": ("Leaf Scorch", "Strawberry leaves may develop reddish-purple margins and dry brown scorched areas.", "Remove old affected leaves, maintain even soil moisture, improve airflow, and confirm whether the cause is fungal or environmental.", "Moderate"),
+}
+CROP_DISPLAY_ALIASES = {"apple": "Apple", "blueberry": "Blueberry", "cherry": "Cherry", "corn": "Corn", "grape": "Grape", "orange": "Orange", "peach": "Peach", "bell pepper": "Bell Pepper", "pepper": "Bell Pepper", "potato": "Potato", "raspberry": "Raspberry", "soybean": "Soybean", "squash": "Squash", "strawberry": "Strawberry", "tomato": "Tomato"}
+
 # Common crop nutrient issues to inspect in the field. These are screening clues,
 # not diagnoses inferred from a leaf-disease classifier.
 NUTRIENT_GUIDANCE = {
@@ -391,7 +424,11 @@ class PlantDiseaseModel:
             if getattr(self.model, "n_features_in_", None) == 9:
                 return self.model
             self.model = None
-        return self.train()
+        raise FileNotFoundError(
+            f"Trained PlantVillage model not found at {self.model_path}. "
+            "Download the PlantVillage dataset and run backend/scripts/train_disease_model.py. "
+            "Synthetic disease predictions are disabled."
+        )
 
     @staticmethod
     def nutrient_guidance(crop_name: str | None) -> dict:
@@ -420,52 +457,84 @@ class PlantDiseaseModel:
 
     def predict(self, image: Image.Image):
         loaded = self.load_or_train()
-        if isinstance(loaded, dict) and loaded.get("kind") in {
-            "plant_disease_folders_v1",
-            "plant_disease_hog_v2",
-        }:
+        trained_bundle = isinstance(loaded, dict) and loaded.get("kind") == "plant_disease_hog_v2"
+        if trained_bundle:
             model = loaded["classifier"]
-            score_name = (
-                "test accuracy"
-                if loaded.get("split_strategy") == "provided_train_test_split"
-                else "validation accuracy"
-            )
-            score_details = f"held-out {score_name} {loaded['validation_accuracy']:.1%}"
-            if loaded.get("macro_f1") is not None:
-                score_details += f", macro-F1 {loaded['macro_f1']:.1%}"
+            split_label = "test" if loaded.get("split_strategy") == "provided_train_test_split" else "validation"
             warning = (
-                f"Prototype image model trained on {loaded['dataset_images']} labelled images; "
-                f"{score_details}. "
-                "This dataset score is not a field diagnosis; confirm with an agricultural expert."
+                f"PlantVillage classifier trained on {loaded['dataset_images']:,} labelled images "
+                f"across {len(model.classes_)} crop/disease classes. Held-out {split_label} accuracy "
+                f"{loaded['validation_accuracy']:.1%}, macro-F1 {loaded.get('macro_f1', 0):.1%}. "
+                "PlantVillage images are controlled-background research images; field performance may differ."
             )
         else:
-            model = loaded
-            warning = "Prototype classifier trained on synthetic samples; this is not a diagnosis. Confirm with a local agronomist."
-        features = (
-            self._extract_plantvillage_features(image)
-            if isinstance(loaded, dict) and loaded.get("kind") == "plant_disease_hog_v2"
-            else self._extract_features(image)
-        ).reshape(1, -1)
-        probabilities = model.predict_proba(features)[0]
-        label = str(model.classes_[int(np.argmax(probabilities))])
-        confidence = float(np.max(probabilities))
+            raise RuntimeError("A real PlantVillage disease model is required; synthetic fallback predictions are disabled.")
 
-        info = DISEASE_INFO.get(label, {
-            "severity": "Needs expert review",
-            "symptoms": "The image model matched this dataset class; verify symptoms in the field.",
-            "treatment": "Do not apply pesticide based only on this model output. Confirm the disease with a local agricultural expert.",
-            "prevention": "Use field scouting, clean tools, and locally recommended integrated pest management.",
-        })
+        features = self._extract_plantvillage_features(image).reshape(1, -1)
+        probabilities = model.predict_proba(features)[0]
+        ranked = np.argsort(probabilities)[::-1][:3]
+        raw_label = str(model.classes_[int(ranked[0])])
+        confidence = float(probabilities[int(ranked[0])])
+        parts = raw_label.split("___", 1)
+        crop_key = parts[0] if len(parts) == 2 else ""
+        disease_key = parts[1] if len(parts) == 2 else raw_label
+        detected_crop = PLANT_DISEASE_CROPS.get(crop_key, crop_key.replace("_", " ").replace(",", "").title())
+        disease_slug = disease_key.lower().replace(" ", "_").replace("-", "_").strip("_")
+        disease_info = DISEASE_CLASS_INFO.get(disease_slug)
+        if disease_info is None:
+            display_disease = disease_key.replace("_", " ").strip().title()
+            symptoms = "The model matched this PlantVillage class. Compare the visible signs with the crop and ask an agricultural expert to confirm."
+            treatment = "Do not apply a pesticide based only on this image. Remove heavily affected material where appropriate and obtain local crop-protection advice."
+            prevention = "Use clean planting material, field sanitation, crop rotation where suitable, and regular scouting."
+            severity = "Needs expert review"
+        else:
+            display_disease, symptoms, treatment, severity = disease_info
+            prevention = treatment
+        healthy = disease_slug == "healthy"
+        display_label = f"{detected_crop} — {display_disease}"
+        top_predictions = []
+        for index in ranked:
+            candidate = str(model.classes_[int(index)])
+            candidate_parts = candidate.split("___", 1)
+            candidate_crop = PLANT_DISEASE_CROPS.get(candidate_parts[0], candidate_parts[0].replace("_", " ").title())
+            candidate_disease = candidate_parts[1] if len(candidate_parts) == 2 else candidate
+            candidate_slug = candidate_disease.lower().replace(" ", "_").replace("-", "_").strip("_")
+            candidate_info = DISEASE_CLASS_INFO.get(candidate_slug)
+            candidate_name = candidate_info[0] if candidate_info else candidate_disease.replace("_", " ").strip().title()
+            top_predictions.append({
+                "crop": candidate_crop,
+                "disease": candidate_name,
+                "label": f"{candidate_crop} — {candidate_name}",
+                "scorePct": round(float(probabilities[int(index)]) * 100, 1),
+            })
+
+        if confidence < 0.35:
+            prediction_status = "low_confidence"
+            warning += " The model score is low; retake a clear close-up photo in natural light and seek expert confirmation."
+        else:
+            prediction_status = "prediction"
 
         return {
-            "predictedDisease": label,
+            "predictedDisease": display_label,
+            "diseaseName": display_disease,
+            "detectedCrop": detected_crop,
+            "modelClass": raw_label,
+            "predictionStatus": prediction_status,
             "confidence": round(confidence, 3),
-            "confidencePct": int(confidence * 100),
-            "severity": info["severity"],
-            "symptoms": info["symptoms"],
-            "treatment": info["treatment"],
-            "prevention": info["prevention"],
-            "affectedCropParts": ["Leaves", "Stem"] if label != "Healthy" else ["Whole plant"],
+            "confidencePct": round(confidence * 100, 1),
+            "severity": severity,
+            "symptoms": symptoms,
+            "treatment": treatment,
+            "prevention": prevention,
+            "affectedCropParts": ["Leaves", "Fruit", "Stem"] if not healthy else ["Whole plant"],
+            "topPredictions": top_predictions,
+            "modelMetrics": {
+                "datasetImages": loaded["dataset_images"],
+                "classCount": len(model.classes_),
+                "testAccuracyPct": round(loaded["validation_accuracy"] * 100, 1),
+                "macroF1Pct": round(loaded.get("macro_f1", 0) * 100, 1),
+                "testImages": loaded.get("test_images") or loaded.get("validation_images"),
+            },
             "warning": warning,
         }
 
