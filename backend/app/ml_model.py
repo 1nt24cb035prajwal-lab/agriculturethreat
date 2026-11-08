@@ -455,7 +455,16 @@ class PlantDiseaseModel:
             ),
         }
 
-    def predict(self, image: Image.Image):
+    @staticmethod
+    def _normalize_crop_name(crop_name: str) -> str:
+        value = str(crop_name or "").strip().lower().replace("_", " ").replace("-", " ")
+        aliases = {
+            "maize": "corn", "corn maize": "corn", "pepper": "bell pepper",
+            "capsicum": "bell pepper", "chilli": "chili",
+        }
+        return aliases.get(value, value)
+
+    def predict(self, image: Image.Image, crop_name: str | None = None):
         loaded = self.load_or_train()
         trained_bundle = isinstance(loaded, dict) and loaded.get("kind") == "plant_disease_hog_v2"
         if trained_bundle:
@@ -472,6 +481,29 @@ class PlantDiseaseModel:
 
         features = self._extract_plantvillage_features(image).reshape(1, -1)
         probabilities = model.predict_proba(features)[0]
+        # Restrict diagnosis to the farmer's selected crop. The PlantVillage
+        # model contains no Sugarcane/Rice/Wheat/etc. classes, so never label
+        # those crops as an unrelated supported crop.
+        requested_crop = self._normalize_crop_name(crop_name)
+        if requested_crop:
+            crop_indices = [
+                index for index, label in enumerate(model.classes_)
+                if "___" in str(label)
+                and self._normalize_crop_name(
+                    PLANT_DISEASE_CROPS.get(str(label).split("___", 1)[0],
+                        str(label).split("___", 1)[0].replace("_", " ").replace(",", "").title())
+                ) == requested_crop
+            ]
+            if not crop_indices:
+                supported = sorted(set(PLANT_DISEASE_CROPS.values()))
+                raise ValueError(
+                    f"Disease detection for {crop_name} is not supported by the installed PlantVillage model. "
+                    f"Supported crops: {', '.join(supported)}. Do not use another crop's result as a diagnosis."
+                )
+            probabilities = probabilities.copy()
+            excluded = np.ones(len(probabilities), dtype=bool)
+            excluded[crop_indices] = False
+            probabilities[excluded] = 0.0
         ranked = np.argsort(probabilities)[::-1][:3]
         raw_label = str(model.classes_[int(ranked[0])])
         confidence = float(probabilities[int(ranked[0])])
