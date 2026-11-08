@@ -853,19 +853,7 @@ const updateDiseaseImageSelection = (input) => {
   removeButton.classList.remove('hidden');
 };
 
-const updateDiseaseImageSelection = (input) => {
-  const image = input.files[0];
-  if (!image) return;
-  selectedDiseaseFile = image;
-  diseaseImageInput.value = '';
-  diseaseCameraInput.value = '';
-  const preview = document.getElementById('diseasePreview');
-  const removeButton = document.getElementById('removeDiseaseImage');
-  document.getElementById('diseaseSelectedFile').textContent = `Selected: ${image.name}`;
-  preview.src = URL.createObjectURL(image);
-  preview.classList.remove('hidden');
-  removeButton.classList.remove('hidden');
-};
+
 
 diseaseImageInput.addEventListener('change', () => updateDiseaseImageSelection(diseaseImageInput));
 diseaseCameraInput.addEventListener('change', () => updateDiseaseImageSelection(diseaseCameraInput));
