@@ -22,8 +22,8 @@ def main() -> int:
         "macro_f1": round(bundle["macro_f1"], 4),
         "class_count": len(bundle["classifier"].classes_),
         "classes": list(bundle["classifier"].classes_),
-        "model": "PlantVillage HOG + RGB/HSV histograms + SGD logistic classifier",
-        "note": "Held-out PlantVillage metrics are benchmark results, not field diagnostic accuracy.",
+        "model": "Combined crop-disease HOG + RGB/HSV histograms + SGD logistic classifier",
+        "note": "Held-out dataset metrics are benchmark results, not independent field diagnostic accuracy. Dataset class names determine supported crops.",
         "model_path": str(model.model_path),
     }
     print(json.dumps(report, indent=2))

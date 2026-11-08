@@ -58,6 +58,9 @@ PLANT_DISEASE_CROPS = {
     "Pepper,_bell": "Bell Pepper", "Potato": "Potato", "Raspberry": "Raspberry",
     "Soybean": "Soybean", "Squash": "Squash", "Strawberry": "Strawberry", "Tomato": "Tomato",
     "Sugarcane": "Sugarcane",
+    "Cashew": "Cashew", "Cassava": "Cassava", "Maize": "Corn", "Papaya": "Papaya",
+    "Rice": "Rice", "Chilli": "Chilli", "Grapes": "Grape", "Citrus": "Citrus",
+    "Groundnut": "Groundnut", "Cotton": "Cotton", "Wheat": "Wheat", "Soyabean": "Soybean",
 }
 DISEASE_CLASS_INFO = {
     "healthy": ("Healthy", "No disease pattern was identified in this image. Continue scouting; a healthy-looking leaf does not rule out other plant problems.", "Keep using clean seed or planting material, balanced nutrition, and regular field scouting.", "Low"),
@@ -461,7 +464,7 @@ class PlantDiseaseModel:
         value = str(crop_name or "").strip().lower().replace("_", " ").replace("-", " ")
         aliases = {
             "maize": "corn", "corn maize": "corn", "pepper": "bell pepper",
-            "capsicum": "bell pepper", "chilli": "chili", "grapes": "grape",
+            "capsicum": "bell pepper", "chilli": "chilli", "grapes": "grape", "maize": "corn", "soyabean": "soybean",
         }
         return aliases.get(value, value)
 
