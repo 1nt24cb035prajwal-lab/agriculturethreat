@@ -835,24 +835,33 @@ cropRecommendationForm.addEventListener('submit', generateRecommendation);
 initializeFarmMap();
 window.addEventListener('popstate', renderCurrentPage);
 
-diseaseImageInput.addEventListener('change', () => {
-  const image = diseaseImageInput.files[0];
+const updateDiseaseImageSelection = (input) => {
+  const image = input.files[0];
+  if (!image) return;
+  selectedDiseaseFile = image;
+  diseaseImageInput.value = '';
+  diseaseCameraInput.value = '';
   const preview = document.getElementById('diseasePreview');
   const removeButton = document.getElementById('removeDiseaseImage');
-  if (!image) {
-    preview.classList.add('hidden');
-    removeButton.classList.add('hidden');
-    preview.removeAttribute('src');
-    return;
-  }
+  document.getElementById('diseaseSelectedFile').textContent = `Selected: ${image.name}`;
   preview.src = URL.createObjectURL(image);
   preview.classList.remove('hidden');
   removeButton.classList.remove('hidden');
-});
+};
 
+diseaseImageInput.addEventListener('change', () => updateDiseaseImageSelection(diseaseImageInput));
+diseaseCameraInput.addEventListener('change', () => updateDiseaseImageSelection(diseaseCameraInput));
+document.getElementById('openDiseaseCamera').addEventListener('click', () => diseaseCameraInput.click());
+document.getElementById('openDiseaseFile').addEventListener('click', () => diseaseImageInput.click());
 document.getElementById('removeDiseaseImage').addEventListener('click', () => {
+  selectedDiseaseFile = null;
   diseaseImageInput.value = '';
-  diseaseImageInput.dispatchEvent(new Event('change'));
+  diseaseCameraInput.value = '';
+  const preview = document.getElementById('diseasePreview');
+  preview.classList.add('hidden');
+  preview.removeAttribute('src');
+  document.getElementById('removeDiseaseImage').classList.add('hidden');
+  document.getElementById('diseaseSelectedFile').textContent = 'No image selected yet. Choose camera or file upload above.';
 });
 
 for (const button of [primaryAction, primarySecondary]) {
