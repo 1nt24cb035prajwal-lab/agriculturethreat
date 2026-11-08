@@ -62,3 +62,15 @@ PlantVillage is a controlled-image research benchmark. The disease model uses HO
 - Run: python backend/scripts/prepare_sugarcane_dataset.py, then python backend/scripts/train_disease_model.py.
 
 **Coverage warning:** this adds Sugarcane; it does not yet provide validated disease datasets for every crop in the website's 24-crop selector. The current PlantVillage model plus this dataset must not be advertised as supporting all 24 crops. Rice, Wheat, Cotton, Groundnut, Onion, Coconut, Arecanut, Ragi, Jowar, Bajra, Sunflower, Mustard, Chilli, Brinjal, Cabbage, Cauliflower, Banana, Mango, and other crops require their own verified image coverage and crop-specific evaluation before activation. A crop absent from the trained class list remains unsupported.
+
+
+## 15-crop / 45-disease dataset (FC45DHLPD)
+
+- Source: [Mendeley Data FC45DHLPD, version 1](https://data.mendeley.com/datasets/ph9g2cfxwm/1), DOI `10.17632/ph9g2cfxwm.1`.
+- Author: Anand Kumar Jain and contributors; dataset institutions include MNIT Jaipur, Bikaner Technical University, and Kota Agriculture University / Rajasthan Agriculture Department.
+- Published description lists Cashew, Cassava, Tomato, Potato, Maize, Papaya, Sugarcane, Rice, Chilli, Grapes, Citrus, Groundnut, Cotton, Wheat, and Soyabean. The ZIP is about 4.15 GB. Licence: CC BY 4.0. Cite the dataset and retain attribution.
+- Download and prepare: `python backend/scripts/prepare_fc45_dataset.py`. If the automatic public API download fails, download the ZIP from the Mendeley page and run `python backend/scripts/prepare_fc45_dataset.py --archive "C:\\path\\to\\15 Crop 45 Disease and Healthy Leaf dataset.zip"`.
+- Then train: `python backend/scripts/train_disease_model.py`. The script combines the new class folders with the existing PlantVillage and Sugarcane folders under `backend/data/plant_disease/train` and `test`.
+- The prepared FC45 images are stored as local links/copies under the data directory. Do not commit the ZIP or extracted images to Git; they are multi-gigabyte data assets. The downloader emits `fc45_dataset_report.json` with detected classes and counts.
+- The published title describes 15 crops and 45 disease/healthy categories; the preparation script reports the actual folder-derived crop and class counts instead of assuming a specific class count. Check that all 15 crops and expected classes are recognized before training.
+- The existing HOG + colour histogram SGD classifier is a lightweight baseline. It is not a modern deep-learning model and should be validated on independent field photos before being used for farm decisions. A random image split may contain near-duplicates; do not present its score as field accuracy.
