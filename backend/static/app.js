@@ -15,6 +15,8 @@ const recommendationSummary = document.getElementById('recommendationSummary');
 const adminStats = document.getElementById('adminStats');
 const diseaseForm = document.getElementById('diseaseForm');
 const diseaseImageInput = document.getElementById('diseaseImage');
+const diseaseCameraInput = document.getElementById('diseaseCameraInput');
+let selectedDiseaseFile = null;
 const diseaseResult = document.getElementById('diseaseResult');
 const cropRecommendationForm = document.getElementById('cropRecommendationForm');
 const recommendationResult = document.getElementById('recommendationResult');
@@ -448,7 +450,7 @@ const saveFarmProfile = async () => {
 
 const analyzeDisease = async (event) => {
   event.preventDefault();
-  const file = diseaseImageInput.files[0];
+  const file = selectedDiseaseFile || diseaseImageInput.files[0] || diseaseCameraInput.files[0];
   const savedCrop = cropRecommendationForm.elements.namedItem('cropName').value;
   const diseaseCropInput = document.getElementById('diseaseCropName');
   if (!diseaseCropInput.value.trim() && savedCrop) diseaseCropInput.value = savedCrop;
@@ -505,6 +507,7 @@ const analyzeDisease = async (event) => {
           </article>
         `).join('')
       : '<p>No crop-specific nutrient checklist is available. Ask an agricultural officer for a soil test.</p>';
+    const googleImageUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${detectedCrop} ${diseaseName || predictedDisease} plant leaf symptoms`)}`;
     diseaseResult.innerHTML = `
       <div class="diagnosis-summary">
         <strong>Crop:</strong> ${escapeHtml(cropName)} · <strong>Growth stage:</strong> ${escapeHtml(cropStage || 'Not provided')}<br>
@@ -512,6 +515,7 @@ const analyzeDisease = async (event) => {
         <strong>Detected disease:</strong> ${escapeHtml(predictedDisease)}<br>
         <strong>Model confidence:</strong> ${confidencePct}% · <strong>Severity:</strong> ${escapeHtml(severity)}<br>
         <strong>Specific disease:</strong> ${escapeHtml(diseaseName || predictedDisease)}
+        <p><a class="secondary-btn google-reference-link" href="${googleImageUrl}" target="_blank" rel="noopener noreferrer">Compare with Google Images references</a></p>
         ${cropMismatch ? `<p class="diagnosis-warning">Crop mismatch: your selected crop is ${escapeHtml(cropName)}, but the model's closest match is ${escapeHtml(detectedCrop)}. Please check the image and selected crop before using this result.</p>` : ''}
         ${predictionStatus === 'low_confidence' ? '<p class="diagnosis-warning">Low-confidence result: upload a clearer close-up photo before relying on this prediction.</p>' : ''}
         <details class="prediction-alternatives"><summary>View top 3 model matches</summary><ol>${topPredictionMarkup}</ol></details>
@@ -834,6 +838,20 @@ diseaseForm.addEventListener('submit', analyzeDisease);
 cropRecommendationForm.addEventListener('submit', generateRecommendation);
 initializeFarmMap();
 window.addEventListener('popstate', renderCurrentPage);
+
+const updateDiseaseImageSelection = (input) => {
+  const image = input.files[0];
+  if (!image) return;
+  selectedDiseaseFile = image;
+  diseaseImageInput.value = '';
+  diseaseCameraInput.value = '';
+  const preview = document.getElementById('diseasePreview');
+  const removeButton = document.getElementById('removeDiseaseImage');
+  document.getElementById('diseaseSelectedFile').textContent = `Selected: ${image.name}`;
+  preview.src = URL.createObjectURL(image);
+  preview.classList.remove('hidden');
+  removeButton.classList.remove('hidden');
+};
 
 const updateDiseaseImageSelection = (input) => {
   const image = input.files[0];
