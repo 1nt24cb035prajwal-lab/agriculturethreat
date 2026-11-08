@@ -1,0 +1,2 @@
+# Training-only dependencies. Keep these out of the production Render requirements.
+datasets>=3.2,<5
