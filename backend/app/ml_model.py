@@ -57,6 +57,7 @@ PLANT_DISEASE_CROPS = {
     "Corn_(maize)": "Corn", "Grape": "Grape", "Orange": "Orange", "Peach": "Peach",
     "Pepper,_bell": "Bell Pepper", "Potato": "Potato", "Raspberry": "Raspberry",
     "Soybean": "Soybean", "Squash": "Squash", "Strawberry": "Strawberry", "Tomato": "Tomato",
+    "Sugarcane": "Sugarcane",
 }
 DISEASE_CLASS_INFO = {
     "healthy": ("Healthy", "No disease pattern was identified in this image. Continue scouting; a healthy-looking leaf does not rule out other plant problems.", "Keep using clean seed or planting material, balanced nutrition, and regular field scouting.", "Low"),
@@ -460,7 +461,7 @@ class PlantDiseaseModel:
         value = str(crop_name or "").strip().lower().replace("_", " ").replace("-", " ")
         aliases = {
             "maize": "corn", "corn maize": "corn", "pepper": "bell pepper",
-            "capsicum": "bell pepper", "chilli": "chili",
+            "capsicum": "bell pepper", "chilli": "chili", "grapes": "grape",
         }
         return aliases.get(value, value)
 
@@ -471,7 +472,7 @@ class PlantDiseaseModel:
             model = loaded["classifier"]
             split_label = "test" if loaded.get("split_strategy") == "provided_train_test_split" else "validation"
             warning = (
-                f"PlantVillage classifier trained on {loaded['dataset_images']:,} labelled images "
+                f"Plant disease classifier trained on {loaded['dataset_images']:,} labelled images "
                 f"across {len(model.classes_)} crop/disease classes. Held-out {split_label} accuracy "
                 f"{loaded['validation_accuracy']:.1%}, macro-F1 {loaded.get('macro_f1', 0):.1%}. "
                 "PlantVillage images are controlled-background research images; field performance may differ."
