@@ -50,3 +50,15 @@ The resulting model files are written to `backend/models/`. The trained disease 
 ## Important limitations
 
 PlantVillage is a controlled-image research benchmark. The disease model uses HOG and color-histogram features with a linear classifier, not a field-validated diagnostic CNN. Its published split score must not be treated as field diagnostic accuracy. Confirm disease and treatment with an agricultural expert.
+
+
+## Additional crop-disease dataset: Sugarcane
+
+- Dataset: [Sugarcane Leaf Disease Classification](https://huggingface.co/datasets/Project-AgML/sugarcane_leaf_disease_classification), based on Thite et al. (2024), DOI: 10.1016/j.dib.2024.110268.
+- License declared by the dataset card: CC BY 4.0. Retain attribution to Thite, Suryawanshi, Patil, and Chumchu.
+- Contains 6,748 field-collected images in 11 classes: Banded Chlorosis, Brown Spot, Brown Rust, Dried, Grassy Shoot, Healthy, Pokkah Boeng, Sett Rot, Smut, Viral Disease, and Yellow Leaf.
+- The preparation script stores this as Sugarcane___<class> folders alongside PlantVillage classes, with a stratified 80/20 split. This is a random split because the dataset provides a single training split; it is not an author-provided independent test set.
+- Install training-only dependencies with: python -m pip install -r backend/training-requirements.txt
+- Run: python backend/scripts/prepare_sugarcane_dataset.py, then python backend/scripts/train_disease_model.py.
+
+**Coverage warning:** this adds Sugarcane; it does not yet provide validated disease datasets for every crop in the website's 24-crop selector. The current PlantVillage model plus this dataset must not be advertised as supporting all 24 crops. Rice, Wheat, Cotton, Groundnut, Onion, Coconut, Arecanut, Ragi, Jowar, Bajra, Sunflower, Mustard, Chilli, Brinjal, Cabbage, Cauliflower, Banana, Mango, and other crops require their own verified image coverage and crop-specific evaluation before activation. A crop absent from the trained class list remains unsupported.
