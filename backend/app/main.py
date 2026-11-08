@@ -23,6 +23,9 @@ from . import integrations
 from . import advanced_services
 from .ml_model import CropRecommendationModel, PlantDiseaseModel
 from .yield_model import YieldPredictionModel
+
+# Ensure SQLite tables exist before the first request (including on fresh Render deploys).
+database.initialize_database()
 MODEL_ENGINE = PlantDiseaseModel(BASE_DIR)
 CROP_MODEL_ENGINE = CropRecommendationModel(BASE_DIR)
 YIELD_MODEL_ENGINE = YieldPredictionModel(BASE_DIR)
