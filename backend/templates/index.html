@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="/static/styles.css?v=20261108-bg1" />
+    <link rel="stylesheet" href="/static/styles.css?v=20261108-disease2" />
   </head>
   <body>
     <div class="page-shell">
@@ -303,11 +303,25 @@
                 <label>Crop<input type="text" id="diseaseCropName" name="cropName" list="cropOptions" placeholder="Use saved crop or enter crop name" /></label>
                 <label>Growth Stage<select id="diseaseCropStage" name="cropStage"><option value="">Select growth stage</option><option value="Germination">Germination</option><option value="Seedling">Seedling</option><option value="Vegetative">Vegetative</option><option value="Flowering">Flowering</option><option value="Fruiting / Grain filling">Fruiting / Grain filling</option><option value="Maturity">Maturity</option><option value="Harvest">Harvest</option></select></label>
               </div>
-              <label>Crop photo<input type="file" id="diseaseImage" name="file" accept="image/jpeg,image/png,image/webp" capture="environment" required /></label>
+              <section class="disease-upload-options" aria-label="Choose how to add a crop photo">
+                <div class="disease-upload-card">
+                  <span class="upload-icon">📷</span><h3>Take a photo using camera</h3>
+                  <p>Capture a clear close-up photo of the affected leaf.</p>
+                  <button class="primary-btn" id="openDiseaseCamera" type="button">Open Camera</button>
+                  <input type="file" id="diseaseCameraInput" accept="image/*" capture="environment" hidden />
+                </div>
+                <div class="disease-upload-card">
+                  <span class="upload-icon">📁</span><h3>Upload an image file</h3>
+                  <p>Select an existing JPG, PNG, or WebP photo.</p>
+                  <button class="secondary-btn" id="openDiseaseFile" type="button">Choose Image File</button>
+                  <input type="file" id="diseaseImage" name="file" accept="image/jpeg,image/png,image/webp" hidden />
+                </div>
+              </section>
+              <p id="diseaseSelectedFile" class="map-status">No image selected yet. Choose camera or file upload above.</p>
               <img id="diseasePreview" class="disease-preview hidden" alt="Preview of selected crop image" />
               <button class="secondary-btn hidden" id="removeDiseaseImage" type="button">Remove image</button>
-              <p class="map-status">Image analysis will show the detected disease, symptoms, fertilizer names, and possible nutrient deficiencies to check. Confirm fertilizer needs with a soil test.</p>
-              <button class="primary-btn" type="submit">Detect Disease</button>
+              <p class="map-status">The model will show the closest supported crop and disease, symptoms, treatment guidance, and fertilizer names for nutrient issues to check. Confirm fertilizer needs with a soil test.</p>
+              <button class="primary-btn" type="submit">Analyze Crop Disease</button>
             </form>
             <div id="diseaseResult" class="disease-result">Upload a crop photo to run AI disease detection.</div>
             <a class="secondary-btn supplier-link" href="https://share.google/tCbEJZtVxZKIURC8C" target="_blank" rel="noopener noreferrer">Find Fertilizer Suppliers</a>
