@@ -1073,3 +1073,7 @@ body {
 .upload-icon { font-size: 1.8rem; }
 .google-reference-link { display: inline-flex; margin-top: 8px; text-decoration: none; }
 @media(max-width:650px) { .disease-upload-options { grid-template-columns: 1fr; } }
+/* The current auth router toggles .hidden, not .active; show whichever form is selected. */
+.auth-form:not(.hidden) {
+  display: grid;
+}
