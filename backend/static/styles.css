@@ -1049,3 +1049,27 @@ body {
 .auth-section .auth-intro p {
   color: #fff;
 }
+
+
+/* Camera/file disease upload chooser and image-reference controls */
+.disease-upload-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+.disease-upload-card {
+  min-height: 190px;
+  padding: 22px;
+  border: 1px solid rgba(39, 104, 65, .18);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.95), rgba(236,249,238,.91)),
+    url("https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&w=1000&q=80") center/cover;
+  box-shadow: 0 12px 28px rgba(18,44,29,.09);
+}
+.disease-upload-card h3 { margin: 8px 0; color: var(--forest); }
+.disease-upload-card p { min-height: 42px; color: #52685a; line-height: 1.45; }
+.upload-icon { font-size: 1.8rem; }
+.google-reference-link { display: inline-flex; margin-top: 8px; text-decoration: none; }
+@media(max-width:650px) { .disease-upload-options { grid-template-columns: 1fr; } }
