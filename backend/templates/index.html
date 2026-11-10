@@ -321,6 +321,23 @@
               <img id="diseasePreview" class="disease-preview hidden" alt="Preview of selected crop image" />
               <button class="secondary-btn hidden" id="removeDiseaseImage" type="button">Remove image</button>
               <p class="map-status">The model will diagnose only the crop you selected when a validated model is available. Unsupported crops will be clearly reported instead of showing another crop's disease. Results include symptoms, treatment guidance, and possible nutrient issues to check; confirm fertilizer needs with a soil test.</p>
+              <details class="dataset-info" open>
+                <summary><strong>Dataset &amp; model information</strong></summary>
+                <div class="dataset-info-body">
+                  <p><strong>Active disease model:</strong> PlantVillage (trained model included in this deployment).</p>
+                  <ul>
+                    <li><strong>Training images:</strong> 54,305 labelled images</li>
+                    <li><strong>Disease classes:</strong> 38 crop/disease classes</li>
+                    <li><strong>Crop species:</strong> 14 in the active PlantVillage model</li>
+                    <li><strong>Held-out test images:</strong> 10,709</li>
+                    <li><strong>Reported test accuracy:</strong> 76.9%</li>
+                    <li><strong>Macro-F1:</strong> 71.8%</li>
+                  </ul>
+                  <p><strong>Planned expansion dataset:</strong> FC45DHLPD (15 crops / 45 disease categories). Its downloader and preparation scripts are in the repository, but the full dataset has not yet been downloaded and used to train the live model. It is <strong>not active</strong> yet.</p>
+                  <p>Only crops with matching classes in the active model can be diagnosed. A crop appearing in a general crop list does not mean the disease model supports it. Never use another crop's prediction as a diagnosis.</p>
+                  <p><a href="https://github.com/1nt24cb035prajwal-lab/agriculturethreat/blob/main/backend/data/README.md" target="_blank" rel="noopener noreferrer">View dataset sources and licences on GitHub</a></p>
+                </div>
+              </details>
               <button class="primary-btn" type="submit">Analyze Crop Disease</button>
             </form>
             <div id="diseaseResult" class="disease-result">Upload a crop photo to run AI disease detection.</div>
