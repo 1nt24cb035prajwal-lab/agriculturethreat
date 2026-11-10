@@ -1077,11 +1077,3 @@ body {
 .auth-form:not(.hidden) {
   display: grid;
 }
-
-/* Dataset transparency panel on the disease detection page */
-.dataset-info{margin:18px 0;padding:16px 18px;border:1px solid #cfe5d5;border-radius:16px;background:#f4fbf5;color:#244d3b}
-.dataset-info summary{cursor:pointer;font-size:1rem;color:#174d36}
-.dataset-info-body{padding-top:10px;line-height:1.6}
-.dataset-info-body ul{padding-left:22px;margin:8px 0}
-.dataset-info-body p{margin:10px 0}
-.dataset-info-body a{color:#176b49;font-weight:700}
