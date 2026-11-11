@@ -4,16 +4,17 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - fix/google-auth-and-real-datasets
+      - main
     paths:
       - "backend/scripts/download_datasets.py"
+      - "backend/scripts/prepare_fc45_dataset.py"
       - "backend/scripts/train_crop_model.py"
       - "backend/scripts/train_disease_model.py"
       - "backend/app/ml_model.py"
       - ".github/workflows/train-models.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   train:
@@ -35,14 +36,31 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r backend/requirements.txt
 
-      - name: Download crop and PlantVillage datasets
-        run: python backend/scripts/download_datasets.py
+      - name: Download crop and yield datasets
+        run: python backend/scripts/download_datasets.py --skip-disease
+
+      - name: Prepare the 15-crop disease image dataset
+        run: |
+          rm -rf backend/data/plant_disease backend/data/fc45_extracted
+          python backend/scripts/prepare_fc45_dataset.py
 
       - name: Train crop recommendation model
         run: python backend/scripts/train_crop_model.py
 
       - name: Train plant disease model
         run: python backend/scripts/train_disease_model.py
+
+      - name: Commit the newly trained disease model for deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f backend/models/plant_disease_model.joblib
+          if ! git diff --cached --quiet; then
+            git commit -m "Update trained 15-crop plant disease model"
+            git push
+          else
+            echo "Trained model is unchanged."
+          fi
 
       - name: Upload trained model files
         uses: actions/upload-artifact@v4
