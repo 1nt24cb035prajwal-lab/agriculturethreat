@@ -4,7 +4,6 @@ import argparse
 import hashlib
 import json
 import re
-[object Promise]
 import sys
 import time
 import urllib.error
