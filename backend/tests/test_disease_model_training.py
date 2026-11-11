@@ -28,6 +28,7 @@ def test_disease_model_trains_from_class_labelled_image_folders(tmp_path: Path):
     assert prediction["detectedCrop"] in {"Unspecified crop", "Tomato"}
     assert prediction["diseaseName"]
     assert prediction["predictionStatus"] in {"prediction", "needs_review"}
+    assert len(prediction["topPredictions"]) == 2
     assert "modelMetrics" not in prediction
     assert "labelled images" not in prediction["warning"]
     assert "accuracy" not in prediction["warning"]
