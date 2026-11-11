@@ -573,6 +573,7 @@ class PlantDiseaseModel:
             "treatment": treatment,
             "prevention": prevention,
             "affectedCropParts": ["Leaves", "Fruit", "Stem"] if not healthy else ["Whole plant"],
+            "topPredictions": top_predictions,
             "warning": warning,
         }
 
