@@ -24,7 +24,12 @@ def test_disease_model_trains_from_class_labelled_image_folders(tmp_path: Path):
     assert bundle["class_counts"] == {"Healthy": 20, "Tomato___Early_blight": 20}
     assert 0 <= bundle["macro_f1"] <= 1
     assert engine._extract_plantvillage_features(Image.new("RGB", (64, 64))).shape == (240,)
-    prediction = engine.predict(Image.new("RGB", (64, 64), color=(50, 180, 50)))
+    engine._classify_image = lambda image: [
+        {"label": "Tomato___healthy", "score": 0.98},
+        {"label": "Tomato___Early_blight", "score": 0.01},
+        {"label": "Tomato___Late_blight", "score": 0.01},
+    ]
+    prediction = engine.predict(Image.new("RGB", (64, 64), color=(50, 180, 50)), crop_name="Tomato")
     assert prediction["detectedCrop"] in {"Unspecified crop", "Tomato"}
     assert prediction["diseaseName"]
     assert prediction["predictionStatus"] in {"prediction", "needs_review"}
