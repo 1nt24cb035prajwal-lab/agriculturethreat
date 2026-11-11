@@ -112,8 +112,6 @@ The farm dashboard retrieves a live seven-day Open-Meteo forecast for saved farm
 
 ## Plant disease detection setup
 
-Disease photo analysis uses the fine-tuned MobileNetV2 PlantVillage classifier through Hugging Face Inference Providers. Add a fine-grained Hugging Face token with **Make calls to Inference Providers** permission as the `HF_TOKEN` environment variable in the Render service. Do not put the token in source code or commit it.
+Disease photo analysis uses the OpenAI vision API through the backend. Add your OpenAI API key as the `OPENAI_API_KEY` environment variable in Render. The optional `OPENAI_VISION_MODEL` setting defaults to `gpt-4.1-mini`. Keep the API key private and never commit it to source control.
 
-The model covers the 38 PlantVillage classes across 14 crops; crops outside those classes are not diagnosed by this model. Results are image-based guidance, not a confirmed field diagnosis. The disease page provides a Google Images search link for visual comparison; Google Images is a reference aid and is not used as the model or as proof of diagnosis.
-
-Model reference: https://huggingface.co/linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification
+The assistant provides cautious visual guidance about possible symptoms, treatment, and prevention. It is not a confirmed field diagnosis; farmers should confirm serious problems with a local agricultural expert before applying crop-protection products. The disease page also provides Google Images examples as a visual comparison aid, not as proof of diagnosis.
