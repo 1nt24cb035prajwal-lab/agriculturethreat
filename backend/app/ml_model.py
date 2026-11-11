@@ -584,41 +584,6 @@ class PlantDiseaseModel:
         }
         return aliases.get(value, value)
 
-    def predict(self, image: Image.Image, crop_name: str | None = None):
-        """Return cautious, farmer-friendly crop health guidance from OpenAI vision."""
-        analysis = self._analyze_with_openai(image, crop_name)
-        disease = str(analysis.get("disease_name") or "Unable to identify clearly").strip()
-        confidence_level = str(analysis.get("confidence_level") or "low").lower()
-        needs_review = confidence_level == "low" or disease.lower() in {
-            "unable to identify clearly", "unknown", "not a plant leaf"
-        }
-        selected_crop = (crop_name or "").strip() or "Unspecified crop"
-        severity = str(analysis.get("severity") or "Needs field inspection")
-        symptoms = str(analysis.get("symptoms") or "The visible signs are not clear enough to describe reliably.")
-        treatment = str(analysis.get("treatment") or "Do not spray based only on this photo. Ask a local agricultural expert to inspect the crop.")
-        prevention = str(analysis.get("prevention") or "Use healthy planting material and inspect the crop regularly.")
-        alternatives = analysis.get("alternatives") if isinstance(analysis.get("alternatives"), list) else []
-        affected_parts = analysis.get("affected_parts") if isinstance(analysis.get("affected_parts"), list) else ["Leaves"]
-        farmer_note = str(analysis.get("farmer_note") or "")
-        display_disease = "Unable to identify clearly" if needs_review else disease
-        summary = f"{selected_crop} — {display_disease}"
-        return {
-            "predictedDisease": summary,
-            "diseaseName": display_disease,
-            "detectedCrop": selected_crop,
-            "predictionStatus": "needs_review" if needs_review else "prediction",
-            "confidence": None,
-            "confidencePct": None,
-            "severity": "Needs field inspection" if needs_review else severity,
-            "symptoms": symptoms,
-            "treatment": treatment,
-            "prevention": prevention,
-            "affectedCropParts": [str(part) for part in affected_parts][:6],
-            "topPredictions": [{"crop": selected_crop, "disease": str(item), "label": f"{selected_crop} — {item}"} for item in alternatives[:3]],
-            "warning": farmer_note or "This is an AI-assisted visual suggestion, not a confirmed field diagnosis. Confirm serious problems with a local agricultural expert before treatment.",
-            "modelName": "OpenAI Vision",
-        }
-
 
 class CropRecommendationModel:
     def __init__(self, base_dir: Path):
