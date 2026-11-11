@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+from io import BytesIO
 from pathlib import Path
 
 import joblib
@@ -210,8 +211,12 @@ class PlantDiseaseModel:
         from huggingface_hub import InferenceClient
         if self._inference_client is None:
             self._inference_client = InferenceClient(provider="hf-inference", api_key=token)
+        # Inference Providers expects raw image bytes (or a path/URL), not a PIL Image.
+        image_buffer = BytesIO()
+        image.convert("RGB").save(image_buffer, format="JPEG", quality=95)
+        image_bytes = image_buffer.getvalue()
         predictions = self._inference_client.image_classification(
-            image.convert("RGB"),
+            image_bytes,
             model="linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification",
             top_k=38,
         )
