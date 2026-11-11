@@ -10,7 +10,6 @@ on:
       - "backend/scripts/prepare_fc45_dataset.py"
       - "backend/scripts/train_crop_model.py"
       - "backend/scripts/train_disease_model.py"
-      - "backend/app/ml_model.py"
       - ".github/workflows/train-models.yml"
 
 permissions:
