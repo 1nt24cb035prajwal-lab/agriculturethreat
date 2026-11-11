@@ -473,12 +473,8 @@ class PlantDiseaseModel:
         trained_bundle = isinstance(loaded, dict) and loaded.get("kind") == "plant_disease_hog_v2"
         if trained_bundle:
             model = loaded["classifier"]
-            split_label = "test" if loaded.get("split_strategy") == "provided_train_test_split" else "validation"
             warning = (
-                f"Plant disease classifier trained on {loaded['dataset_images']:,} labelled images "
-                f"across {len(model.classes_)} crop/disease classes. Held-out {split_label} accuracy "
-                f"{loaded['validation_accuracy']:.1%}, macro-F1 {loaded.get('macro_f1', 0):.1%}. "
-                "PlantVillage images are controlled-background research images; field performance may differ."
+                "Image-based guidance is a starting point only. Compare the symptoms in the field and confirm serious problems with a local agricultural expert."
             )
         else:
             raise RuntimeError("A real PlantVillage disease model is required; synthetic fallback predictions are disabled.")
@@ -508,9 +504,15 @@ class PlantDiseaseModel:
             excluded = np.ones(len(probabilities), dtype=bool)
             excluded[crop_indices] = False
             probabilities[excluded] = 0.0
+        # Normalize probabilities within the selected crop after filtering other crops.
+        total_probability = float(probabilities.sum())
+        if total_probability > 0:
+            probabilities = probabilities / total_probability
         ranked = np.argsort(probabilities)[::-1][:3]
         raw_label = str(model.classes_[int(ranked[0])])
         confidence = float(probabilities[int(ranked[0])])
+        second_probability = float(probabilities[int(ranked[1])]) if len(ranked) > 1 else 0.0
+        probability_gap = confidence - second_probability
         parts = raw_label.split("___", 1)
         crop_key = parts[0] if len(parts) == 2 else ""
         disease_key = parts[1] if len(parts) == 2 else raw_label
@@ -544,9 +546,17 @@ class PlantDiseaseModel:
                 "scorePct": round(float(probabilities[int(index)]) * 100, 1),
             })
 
-        if confidence < 0.35:
-            prediction_status = "low_confidence"
-            warning += " The model score is low; retake a clear close-up photo in natural light and seek expert confirmation."
+        # A "healthy" result needs substantially stronger evidence than a disease
+        # suggestion. Otherwise abstain rather than reassure the farmer incorrectly.
+        if (disease_slug == "healthy" and (confidence < 0.92 or probability_gap < 0.35)) or confidence < 0.50 or probability_gap < 0.08:
+            prediction_status = "needs_review"
+            display_disease = "Unable to identify clearly"
+            display_label = f"{detected_crop} — {display_disease}"
+            symptoms = "The photo does not provide a clear enough match. Check both sides of several leaves for spots, streaks, rust-coloured marks, curling, or yellowing."
+            treatment = "Do not apply pesticide or fertilizer based on this result. Take clear close-up photos of affected and healthy leaves and ask a local agricultural officer to confirm the cause."
+            prevention = "Keep the field clean, avoid prolonged leaf wetness, use healthy planting material, and inspect the crop regularly."
+            severity = "Needs field inspection"
+            healthy = False
         else:
             prediction_status = "prediction"
 
@@ -563,14 +573,6 @@ class PlantDiseaseModel:
             "treatment": treatment,
             "prevention": prevention,
             "affectedCropParts": ["Leaves", "Fruit", "Stem"] if not healthy else ["Whole plant"],
-            "topPredictions": top_predictions,
-            "modelMetrics": {
-                "datasetImages": loaded["dataset_images"],
-                "classCount": len(model.classes_),
-                "testAccuracyPct": round(loaded["validation_accuracy"] * 100, 1),
-                "macroF1Pct": round(loaded.get("macro_f1", 0) * 100, 1),
-                "testImages": loaded.get("test_images") or loaded.get("validation_images"),
-            },
             "warning": warning,
         }
 
