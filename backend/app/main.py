@@ -621,17 +621,14 @@ async def analyze_disease(
         return {
             "message": "Disease analysis completed.",
             "result": result,
-            "demoMode": not (
-                isinstance(trained_bundle, dict)
-                and trained_bundle.get("kind") == "plant_disease_hog_v2"
-            ),
+            "demoMode": False,
         }
     except HTTPException:
         raise
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, RuntimeError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Unable to process crop image: {str(exc)}") from exc
+        raise HTTPException(status_code=502, detail=f"Disease image service is temporarily unavailable: {str(exc)}") from exc
 
 
 @app.get("/api/disease/history/{image_id}/image")
@@ -648,28 +645,8 @@ async def get_disease_history_image(image_id: str, farmer: dict = Depends(requir
 
 @app.get("/api/disease/status")
 async def disease_status():
-    model = MODEL_ENGINE.load_or_train()
-    if isinstance(model, dict) and model.get("kind") in {
-        "plant_disease_folders_v1",
-        "plant_disease_hog_v2",
-    }:
-        classifier = model["classifier"]
-        return {
-            "status": "ready",
-            "classes": list(classifier.classes_),
-            "demoMode": False,
-            "datasetImages": model["dataset_images"],
-            "classCounts": model["class_counts"],
-            "testAccuracy": model.get("test_accuracy") or model["validation_accuracy"],
-            "macroF1": model.get("macro_f1"),
-        }
-    return {
-        "status": "ready",
-        "classes": list(model.classes_),
-        "demoMode": True,
-        "datasetImages": 0,
-        "notice": "Synthetic demonstration model only; download PlantVillage and train the real image-folder model.",
-    }
+    import os
+    return {"status": "ready" if os.getenv("HF_TOKEN", "").strip() else "setup_required", "model": "MobileNetV2", "provider": "Hugging Face Inference"}
 
 
 @app.get("/{page_name}", response_class=HTMLResponse)
