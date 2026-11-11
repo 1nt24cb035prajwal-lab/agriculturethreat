@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import csv
 import json
 from io import BytesIO
@@ -201,54 +200,116 @@ class PlantDiseaseModel:
         self.dataset_path = self.model_dir / "plant_disease_dataset.json"
         self.image_dataset_path = base_dir / "data" / "plant_disease"
         self.model = None
-        self._inference_client = None
+        self._vision_processor = None
+        self._vision_model = None
 
-    def _analyze_with_openai(self, image: Image.Image, crop_name: str | None = None):
-        """Analyze a crop-leaf photo with OpenAI vision and return farmer-friendly guidance."""
-        import os
-        api_key = os.getenv("OPENAI_API_KEY", "").strip()
-        if not api_key:
-            raise RuntimeError("OpenAI image analysis is not configured. Add OPENAI_API_KEY to the Render environment.")
-        from openai import OpenAI
+    def _load_vision_model(self):
+        """Load the small public PlantVillage MobileNetV2 model locally (no API key)."""
+        if self._vision_model is None or self._vision_processor is None:
+            import os
+            import torch
+            from transformers import AutoImageProcessor, AutoModelForImageClassification
 
-        buffer = BytesIO()
-        image.convert("RGB").save(buffer, format="JPEG", quality=92, optimize=True)
-        image_data = base64.b64encode(buffer.getvalue()).decode("ascii")
-        crop_context = crop_name.strip() if crop_name else "not specified"
-        prompt = (
-            "You are a careful crop-health assistant for farmers. Inspect the attached leaf photo. "
-            "Identify only visible signs; do not invent a disease. If the image is not clearly a plant leaf, "
-            "or evidence is insufficient, set disease_name to 'Unable to identify clearly' and confidence_level to 'low'. "
-            "A photo alone cannot confirm a diagnosis. Consider nutrient deficiency, pests, weather, and physical damage "
-            "as alternatives where appropriate. Give cautious, practical, locally adaptable guidance. Never prescribe a "
-            "chemical brand or exact pesticide dose. Recommend local agricultural extension advice before spraying. "
-            "Return ONLY valid JSON with keys: disease_name (string), confidence_level ('low'|'medium'|'high'), "
-            "severity ('Low'|'Moderate'|'High'|'Needs field inspection'), symptoms (string), treatment (string), "
-            "prevention (string), affected_parts (array of strings), alternatives (array of strings), "
-            "and farmer_note (string). If healthy-looking, say 'No obvious disease signs visible' but clarify this "
-            "does not prove the whole plant is healthy. Selected crop: " + crop_context + "."
+            torch.set_num_threads(max(1, min(2, os.cpu_count() or 1)))
+            model_id = "linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification"
+            self._vision_processor = AutoImageProcessor.from_pretrained(model_id)
+            self._vision_model = AutoModelForImageClassification.from_pretrained(model_id)
+            self._vision_model.eval()
+        return self._vision_processor, self._vision_model
+
+    def _classify_image(self, image: Image.Image):
+        """Run CPU-only local inference using the public pretrained MobileNetV2 model."""
+        import torch
+        processor, model = self._load_vision_model()
+        inputs = processor(images=image.convert("RGB"), return_tensors="pt")
+        with torch.inference_mode():
+            logits = model(**inputs).logits[0]
+            probabilities = torch.softmax(logits, dim=-1)
+        scores, indices = torch.topk(probabilities, k=min(5, probabilities.numel()))
+        labels = model.config.id2label
+        return [
+            {"label": str(labels.get(int(index), labels.get(str(int(index)), "unknown"))), "score": float(score)}
+            for score, index in zip(scores.tolist(), indices.tolist())
+        ]
+
+    def predict(self, image: Image.Image, crop_name: str | None = None):
+        """Return conservative farmer guidance from a locally hosted image classifier."""
+        predictions = self._classify_image(image)
+        if not predictions:
+            raise RuntimeError("The photo could not be analysed. Please try a clearer leaf photo.")
+
+        def normalize(value):
+            return "".join(ch for ch in str(value).lower() if ch.isalnum())
+
+        def parse_label(item):
+            raw = item["label"]
+            if "___" in raw:
+                crop_raw, disease_raw = raw.split("___", 1)
+            else:
+                crop_raw, disease_raw = "", raw
+            crop_display = PLANT_DISEASE_CROPS.get(crop_raw, crop_raw.replace("_", " ").replace(",", "").replace("(", " ").replace(")", "").strip().title())
+            return crop_raw, crop_display, disease_raw
+
+        selected_crop = (crop_name or "").strip()
+        candidates = predictions
+        if selected_crop:
+            matching = [item for item in predictions if normalize(parse_label(item)[1]) == normalize(selected_crop)]
+            if matching:
+                candidates = matching
+        best = candidates[0]
+        crop_raw, detected_crop, raw_disease = parse_label(best)
+        score = float(best["score"])
+        parts = raw_disease.replace("_", " ").strip()
+        disease_key = raw_disease.lower().replace(" ", "_").replace("-", "_")
+        info = DISEASE_CLASS_INFO.get(disease_key)
+        if info:
+            disease_name, symptoms, treatment, severity = info
+        elif "healthy" in disease_key:
+            disease_name = "Healthy-looking leaf"
+            symptoms = "No common PlantVillage disease pattern was identified in this image."
+            treatment = "Continue regular field scouting and maintain balanced crop care."
+            severity = "Low"
+        else:
+            disease_name = parts.replace("  ", " ").title()
+            symptoms = "The model found a visual pattern associated with this class. Check the leaf and the whole plant for matching signs."
+            treatment = "Remove only clearly affected material where appropriate and ask a local agricultural expert to confirm before applying any crop-protection product."
+            severity = "Needs field inspection"
+
+        is_healthy = "healthy" in disease_key
+        needs_review = score < 0.55 or (not info and not is_healthy)
+        if selected_crop and normalize(detected_crop) != normalize(selected_crop):
+            needs_review = True
+        if needs_review:
+            disease_name = "Possible " + disease_name if not is_healthy else disease_name
+            severity = "Needs field inspection"
+
+        alternatives = []
+        for item in predictions[1:4]:
+            _, alt_crop, alt_disease = parse_label(item)
+            alternatives.append(f"{alt_crop}: {alt_disease.replace('_', ' ').title()}")
+
+        summary_crop = detected_crop or selected_crop or "Unspecified crop"
+        warning = (
+            "This is an AI-assisted suggestion from a free, locally running image model trained on PlantVillage-style leaf images. "
+            "It may be less reliable on field photos, unusual varieties, or crops outside its supported classes. "
+            "Confirm serious problems with a local agricultural expert before treatment."
         )
-        client = OpenAI(api_key=api_key)
-        response = client.responses.create(
-            model=os.getenv("OPENAI_VISION_MODEL", "gpt-4.1-mini"),
-            input=[{
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": prompt},
-                    {"type": "input_image", "image_url": f"data:image/jpeg;base64,{image_data}", "detail": "high"},
-                ],
-            }],
-        )
-        raw = (response.output_text or "").strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        try:
-            result = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("The image assistant returned an unreadable result. Please try again with a clearer photo.") from exc
-        if not isinstance(result, dict) or not result.get("disease_name"):
-            raise RuntimeError("The image assistant could not produce a usable result. Please try another photo.")
-        return result
+        return {
+            "predictedDisease": f"{summary_crop} — {disease_name}",
+            "diseaseName": disease_name,
+            "detectedCrop": summary_crop,
+            "predictionStatus": "needs_review" if needs_review else "prediction",
+            "confidence": None,
+            "confidencePct": None,
+            "severity": severity,
+            "symptoms": symptoms,
+            "treatment": treatment,
+            "prevention": info[2] if info else "Use healthy planting material, maintain field hygiene, avoid prolonged leaf wetness, and monitor the crop regularly.",
+            "affectedCropParts": ["Leaves"],
+            "topPredictions": [{"crop": parse_label(item)[1], "disease": parse_label(item)[2].replace("_", " ").title(), "label": f"{parse_label(item)[1]} — {parse_label(item)[2].replace('_', ' ').title()}"} for item in predictions[:3]],
+            "warning": warning,
+            "modelName": "MobileNetV2 (local)",
+        }
 
     def _build_synthetic_dataset(self):
         rng = np.random.default_rng(42)
