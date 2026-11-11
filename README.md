@@ -110,8 +110,9 @@ python backend\scripts\train_disease_model.py
 The farm dashboard retrieves a live seven-day Open-Meteo forecast for saved farm coordinates, including temperature, rainfall probability, rainfall totals, and FAO reference evapotranspiration. It refreshes automatically every 15 minutes and can be refreshed manually.
 
 
+
 ## Plant disease detection setup
 
-Disease photo classification runs locally on the Render service using the public MobileNetV2 PlantVillage model. It does not require an OpenAI API key, Hugging Face token, or paid inference API. The model covers 38 PlantVillage disease/healthy classes across 14 crops; it may be less reliable on field photos or crops outside those classes.
+Disease photo analysis uses Google's Gemini vision API with the `gemini-2.5-flash-lite` model. This avoids loading a large local PyTorch model and helps the app fit smaller web-service memory limits. Create a free-tier API key in Google AI Studio and add it to Render as `GEMINI_API_KEY`. The optional `GEMINI_MODEL` setting defaults to `gemini-2.5-flash-lite`.
 
-The app provides farmer-friendly symptoms, treatment and prevention guidance. It is an AI-assisted suggestion, not a confirmed field diagnosis. Confirm serious problems with a local agricultural expert before applying crop-protection products.
+Google's Gemini API free tier has model-specific rate limits and availability; usage is not unlimited. Review Google's current pricing and rate-limit pages before using the app with many users. The assistant provides cautious visual guidance, not a confirmed field diagnosis.
