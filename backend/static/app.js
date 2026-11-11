@@ -496,11 +496,14 @@ const analyzeDisease = async (event) => {
         === detectedCrop.toLowerCase().replace(/[^a-z]/g, '')
       );
     if (predictionStatus === 'needs_review') {
+      const referenceCrop = detectedCrop || cropName || 'plant';
+      const reviewGoogleUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${referenceCrop} plant leaf disease symptoms reference`)}`;
       diseaseResult.innerHTML = `
         <div class="diagnosis-summary">
           <strong>Crop:</strong> ${escapeHtml(cropName)} · <strong>Growth stage:</strong> ${escapeHtml(cropStage || 'Not provided')}<br>
           <strong>Result:</strong> Unable to identify the problem clearly
           <p>We don't want to incorrectly label your crop as healthy or recommend the wrong treatment.</p>
+          <p><a class="secondary-btn google-reference-link" href="${reviewGoogleUrl}" target="_blank" rel="noopener noreferrer">View similar leaf symptoms on Google Images</a></p>
         </div>
         <section class="diagnosis-section">
           <h3>What to do next</h3>
@@ -530,6 +533,7 @@ const analyzeDisease = async (event) => {
         <strong>Detected disease:</strong> ${escapeHtml(predictedDisease)}<br>
         <strong>Specific disease:</strong> ${escapeHtml(diseaseName || predictedDisease)}
         <p><a class="secondary-btn google-reference-link" href="${googleImageUrl}" target="_blank" rel="noopener noreferrer">Compare with Google Images references</a></p>
+        <small>Use reference photos to compare visible signs. Search images are examples, not proof of diagnosis.</small>
         ${cropMismatch ? `<p class="diagnosis-warning">Crop mismatch: your selected crop is ${escapeHtml(cropName)}, but the possible match is ${escapeHtml(detectedCrop)}. Please check the image and selected crop before using this result.</p>` : ''}
       </div>
       <section class="diagnosis-section">
