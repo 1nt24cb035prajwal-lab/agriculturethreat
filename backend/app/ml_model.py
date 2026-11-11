@@ -259,8 +259,13 @@ class PlantDiseaseModel:
         best = candidates[0]
         crop_raw, detected_crop, raw_disease = parse_label(best)
         score = float(best["score"])
-        parts = raw_disease.replace("_", " ").strip()
-        disease_key = raw_disease.lower().replace(" ", "_").replace("-", "_")
+        # Some PlantVillage labels repeat the crop name inside the disease label
+        # (for example Tomato___Tomato_Early_blight); remove that prefix for lookup.
+        disease_clean = raw_disease
+        if crop_raw and disease_clean.lower().startswith(crop_raw.lower() + "_"):
+            disease_clean = disease_clean[len(crop_raw) + 1:]
+        parts = disease_clean.replace("_", " ").strip()
+        disease_key = disease_clean.lower().replace(" ", "_").replace("-", "_")
         info = DISEASE_CLASS_INFO.get(disease_key)
         if info:
             disease_name, symptoms, treatment, severity = info
