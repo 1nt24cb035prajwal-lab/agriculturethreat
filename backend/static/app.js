@@ -181,9 +181,6 @@ const loadYieldEstimate = async () => {
   output.textContent = 'Loading historical regional yield prediction...';
   try {
     const result = await api.get('/api/yield');
-    const modelMetrics = result.modelMetrics
-      ? `<br><strong>Chronological holdout:</strong> MAE ${escapeHtml(result.modelMetrics.maeTonnesPerHectare)} t/ha · median percentage error ${escapeHtml(result.modelMetrics.medianAbsolutePercentageError)}% · within 25% ${escapeHtml(result.modelMetrics.within25PercentPercent)}%`
-      : '';
     output.innerHTML = `<strong>Crop:</strong> ${escapeHtml(result.crop)}<br><strong>Expected estimate:</strong> ${escapeHtml(result.expectedEstimateTonnes)} tonnes<br><strong>Yield:</strong> ${escapeHtml(result.predictedYieldTonnesPerHectare ?? 'Reference range')} tonnes/ha<br><strong>Range:</strong> ${escapeHtml(result.lowEstimateTonnes)}–${escapeHtml(result.highEstimateTonnes)} tonnes<br><strong>Area:</strong> ${escapeHtml(result.areaHectares)} ha<br><strong>Confidence:</strong> ${escapeHtml(result.confidence)}${modelMetrics}<br><small>${escapeHtml(result.notice)}</small>`;
   } catch (error) { output.textContent = error.message; }
 };
@@ -486,13 +483,10 @@ const analyzeDisease = async (event) => {
     }
 
     const {
-      predictedDisease, diseaseName, detectedCrop, predictionStatus, confidencePct, severity, symptoms, treatment, prevention,
-      warning, cropName, cropStage, location, affectedCropParts = [], topPredictions = [], modelMetrics = {},
+      predictedDisease, diseaseName, detectedCrop, severity, symptoms, treatment, prevention,
+      warning, cropName, cropStage, location, affectedCropParts = [], 
       nutrientDeficienciesToCheck = [], fertilizerRecommendations = [], nutrientNotice
     } = result.result;
-    const topPredictionMarkup = topPredictions.length
-      ? topPredictions.map((item, index) => `<li><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.scorePct)}% model score</span></li>`).join('')
-      : '<li>Alternative class scores unavailable.</li>';
     const cropMismatch = cropName && cropName !== 'Not provided' && detectedCrop
       && !(
         ({ maize: 'corn', corn: 'corn', pepper: 'bellpepper', 'bell pepper': 'bellpepper' }[cropName.toLowerCase()] || cropName.toLowerCase().replace(/[^a-z]/g, ''))
@@ -513,13 +507,9 @@ const analyzeDisease = async (event) => {
         <strong>Crop:</strong> ${escapeHtml(cropName)} · <strong>Growth stage:</strong> ${escapeHtml(cropStage || 'Not provided')}<br>
         <strong>Farm location:</strong> ${escapeHtml([location.village, location.district, location.state].filter(Boolean).join(', ') || 'Not provided')}<br>
         <strong>Detected disease:</strong> ${escapeHtml(predictedDisease)}<br>
-        <strong>Model confidence:</strong> ${confidencePct}% · <strong>Severity:</strong> ${escapeHtml(severity)}<br>
         <strong>Specific disease:</strong> ${escapeHtml(diseaseName || predictedDisease)}
         <p><a class="secondary-btn google-reference-link" href="${googleImageUrl}" target="_blank" rel="noopener noreferrer">Compare with Google Images references</a></p>
         ${cropMismatch ? `<p class="diagnosis-warning">Crop mismatch: your selected crop is ${escapeHtml(cropName)}, but the model's closest match is ${escapeHtml(detectedCrop)}. Please check the image and selected crop before using this result.</p>` : ''}
-        ${predictionStatus === 'low_confidence' ? '<p class="diagnosis-warning">Low-confidence result: upload a clearer close-up photo before relying on this prediction.</p>' : ''}
-        <details class="prediction-alternatives"><summary>View top 3 model matches</summary><ol>${topPredictionMarkup}</ol></details>
-        <small>Model evaluation: ${escapeHtml(modelMetrics.testAccuracyPct ?? '—')}% held-out test accuracy · ${escapeHtml(modelMetrics.macroF1Pct ?? '—')}% macro-F1 · ${escapeHtml(modelMetrics.datasetImages ?? '—')} training/test images.</small>
       </div>
       <section class="diagnosis-section">
         <h3>Symptoms and affected plant parts</h3>
@@ -564,11 +554,10 @@ const generateRecommendation = async (event) => {
       throw new Error(result.detail || 'Recommendation failed.');
     }
 
-    const { crop, requestedCrop, suitability, confidencePct, locationZone, reason, irrigationAdvice, fertilizerAdvice, risk, yieldExpectation, datasetNotice, alternatives = [] } = result.recommendation;
+    const { crop, requestedCrop, suitability, locationZone, reason, irrigationAdvice, fertilizerAdvice, risk, yieldExpectation } = result.recommendation;
     recommendationResult.innerHTML = `
       <strong>Crop entered:</strong> ${escapeHtml(requestedCrop)}<br>
-      <strong>Model suggestion:</strong> ${escapeHtml(crop)} (${escapeHtml(suitability)})<br>
-      <strong>Confidence:</strong> ${confidencePct}%<br>
+      <strong>Recommended crop:</strong> ${escapeHtml(crop)} (${escapeHtml(suitability)})<br>
       <strong>Farm:</strong> ${escapeHtml(result.location.village)}, ${escapeHtml(result.location.district)}, ${escapeHtml(result.location.state)}<br>
       <strong>Location zone:</strong> ${escapeHtml(locationZone)}<br>
       <strong>Why this crop:</strong> ${escapeHtml(reason)}<br>
@@ -576,16 +565,13 @@ const generateRecommendation = async (event) => {
       <strong>Fertilizer:</strong> ${escapeHtml(fertilizerAdvice)}<br>
       <strong>Risk:</strong> ${escapeHtml(risk)}<br>
       <strong>Yield expectation:</strong> ${escapeHtml(yieldExpectation)}<br>
-      <strong>Other suitable model candidates:</strong> ${alternatives.map(item => `${escapeHtml(item.crop)} (${escapeHtml(item.confidencePct)}%)`).join(', ')}<br>
-      <small>${escapeHtml(datasetNotice)}</small>
     `;
 
     recommendationSummary.innerHTML = `
       <div><strong>Farmer:</strong> ${escapeHtml(result.farmer.name)}</div>
       <div><strong>Farm:</strong> ${escapeHtml(result.location.village)}, ${escapeHtml(result.location.district)}, ${escapeHtml(result.location.state)}</div>
       <div><strong>Crop entered:</strong> ${escapeHtml(requestedCrop)}</div>
-      <div><strong>Model suggestion:</strong> ${escapeHtml(crop)} (${escapeHtml(suitability)})</div>
-      <div><strong>Confidence:</strong> ${confidencePct}%</div>
+      <div><strong>Recommended crop:</strong> ${escapeHtml(crop)} (${escapeHtml(suitability)})</div>
       <div><strong>Guidance:</strong> ${escapeHtml(irrigationAdvice)}</div>
     `;
     renderActivity((await api.get('/api/activity')).items);
