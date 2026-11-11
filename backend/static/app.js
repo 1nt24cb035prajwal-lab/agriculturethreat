@@ -181,7 +181,7 @@ const loadYieldEstimate = async () => {
   output.textContent = 'Loading historical regional yield prediction...';
   try {
     const result = await api.get('/api/yield');
-    output.innerHTML = `<strong>Crop:</strong> ${escapeHtml(result.crop)}<br><strong>Expected estimate:</strong> ${escapeHtml(result.expectedEstimateTonnes)} tonnes<br><strong>Yield:</strong> ${escapeHtml(result.predictedYieldTonnesPerHectare ?? 'Reference range')} tonnes/ha<br><strong>Range:</strong> ${escapeHtml(result.lowEstimateTonnes)}–${escapeHtml(result.highEstimateTonnes)} tonnes<br><strong>Area:</strong> ${escapeHtml(result.areaHectares)} ha<br><strong>Confidence:</strong> ${escapeHtml(result.confidence)}${modelMetrics}<br><small>${escapeHtml(result.notice)}</small>`;
+    output.innerHTML = `<strong>Crop:</strong> ${escapeHtml(result.crop)}<br><strong>Estimated harvest:</strong> ${escapeHtml(result.expectedEstimateTonnes)} tonnes<br><strong>Possible range:</strong> ${escapeHtml(result.lowEstimateTonnes)}–${escapeHtml(result.highEstimateTonnes)} tonnes<br><strong>Farm area:</strong> ${escapeHtml(result.areaHectares)} hectares`;
   } catch (error) { output.textContent = error.message; }
 };
 
@@ -509,7 +509,7 @@ const analyzeDisease = async (event) => {
         <strong>Detected disease:</strong> ${escapeHtml(predictedDisease)}<br>
         <strong>Specific disease:</strong> ${escapeHtml(diseaseName || predictedDisease)}
         <p><a class="secondary-btn google-reference-link" href="${googleImageUrl}" target="_blank" rel="noopener noreferrer">Compare with Google Images references</a></p>
-        ${cropMismatch ? `<p class="diagnosis-warning">Crop mismatch: your selected crop is ${escapeHtml(cropName)}, but the model's closest match is ${escapeHtml(detectedCrop)}. Please check the image and selected crop before using this result.</p>` : ''}
+        ${cropMismatch ? `<p class="diagnosis-warning">Crop mismatch: your selected crop is ${escapeHtml(cropName)}, but the possible match is ${escapeHtml(detectedCrop)}. Please check the image and selected crop before using this result.</p>` : ''}
       </div>
       <section class="diagnosis-section">
         <h3>Symptoms and affected plant parts</h3>
