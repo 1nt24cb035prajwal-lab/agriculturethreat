@@ -33,7 +33,7 @@ let threatRefreshTimer;
 
 const api = {
   get: async (path) => {
-    const response = await fetch(path);
+    const response = await fetch(path, { credentials: 'include' });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.detail || 'Request failed');
@@ -43,6 +43,7 @@ const api = {
   post: async (path, body) => {
     const response = await fetch(path, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
@@ -55,6 +56,7 @@ const api = {
   put: async (path, body) => {
     const response = await fetch(path, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
@@ -474,6 +476,7 @@ const analyzeDisease = async (event) => {
   try {
     const response = await fetch('/api/disease/analyze', {
       method: 'POST',
+      credentials: 'include',
       body: formData
     });
 
@@ -546,6 +549,7 @@ const generateRecommendation = async (event) => {
     await api.put('/api/farm/profile', payload);
     const response = await fetch('/api/farm/recommendation', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
