@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="/static/styles.css?v=20261110-dataset-info" />
+    <link rel="stylesheet" href="/static/styles.css?v=20261111-farmer-clean" />
   </head>
   <body>
     <div class="page-shell">
@@ -35,10 +35,10 @@
       <main>
         <section class="hero">
           <div class="hero-copy">
-            <p class="eyebrow">AI-powered agricultural threat intelligence</p>
+            <p class="eyebrow">Simple tools for healthier crops and better farm decisions</p>
             <h1>Smart Farming Starts with Intelligent Threat Detection</h1>
             <p class="lead">
-              Keep farmer and farm records together, choose a farm location on a map, and review clearly labeled prototype crop and image recommendations.
+              Manage your farm, check local weather, identify possible crop problems, and get practical farming guidance in one place.
             </p>
             <div class="cta-row">
               <button class="primary-btn large" id="ctaPrimary">Get Started</button>
@@ -47,7 +47,7 @@
             <div class="mini-stats">
               <div><strong>Private</strong><span>Farmer profiles</span></div>
               <div><strong>Location</strong><span>Map-based farm inputs</span></div>
-              <div><strong>Prototype</strong><span>AI recommendations</span></div>
+              <div><strong>Guidance</strong><span>Practical farming support</span></div>
             </div>
           </div>
           <div class="hero-visual">
@@ -88,12 +88,12 @@
             <h2>Powerful features for safer farming</h2>
           </div>
           <div class="feature-grid">
-            <article class="feature-card"><span>🩺</span><h3>Specific Crop Disease Detection</h3><p>PlantVillage image classifier identifies 38 crop-and-disease classes, with symptoms, top matches, and cautious treatment guidance.</p></article>
+            <article class="feature-card"><span>🩺</span><h3>Specific Crop Disease Detection</h3><p>Upload a leaf photo to check for possible crop diseases and receive symptoms, treatment, and prevention guidance.</p></article>
             <article class="feature-card"><span>⛅</span><h3>Weather Monitoring</h3><p>Current conditions and a seven-day forecast use Open-Meteo for the saved farm coordinates.</p></article>
-            <article class="feature-card"><span>🛰️</span><h3>Satellite Vegetation</h3><p>Satellite imagery and NDVI are unavailable until a provider is configured.</p></article>
-            <article class="feature-card"><span>💧</span><h3>Water Planning</h3><p>Save irrigation and soil details with the farm profile; validated sensor and evapotranspiration data are not connected.</p></article>
+            <article class="feature-card"><span>🛰️</span><h3>Satellite Vegetation</h3><p>Monitor vegetation conditions for your farm when satellite information is available.</p></article>
+            <article class="feature-card"><span>💧</span><h3>Water Planning</h3><p>Get irrigation guidance using your crop, soil, and farm information.</p></article>
             <article class="feature-card"><span>🌱</span><h3>Soil and Crop Records</h3><p>Store crop, season, irrigation, water source, and optional soil test measurements per farmer.</p></article>
-            <article class="feature-card"><span>📈</span><h3>Crop Yield Prediction</h3><p>Estimate yield from historical India crop-production records, with a chronological holdout score shown alongside the result.</p></article>
+            <article class="feature-card"><span>📈</span><h3>Crop Yield Prediction</h3><p>View an estimated harvest based on your crop and farm details.</p></article>
             <article class="feature-card"><span>🚨</span><h3>Weather Threat Indicators</h3><p>Weather-based risk indicators use the saved farm location and Open-Meteo forecast. Pest and disease alerts are not connected.</p></article>
           </div>
         </section>
@@ -106,7 +106,7 @@
           <div class="workflow-grid">
             <div class="step"><span>1</span><h3>Farmer Registration</h3><p>Create a profile and add farm details.</p></div>
             <div class="step"><span>2</span><h3>Save Farm Details</h3><p>Record crop, land, soil, irrigation, and a map-selected location in your account.</p></div>
-            <div class="step"><span>3</span><h3>Review Prototype Advice</h3><p>Use crop and image suggestions as decision support only, not verified diagnoses.</p></div>
+            <div class="step"><span>3</span><h3>Review Farming Guidance</h3><p>Review crop suggestions and disease guidance. Confirm serious crop problems with a local agricultural expert.</p></div>
             <div class="step"><span>4</span><h3>Check Activity</h3><p>Review saved farm updates, recommendations, and private image-analysis history.</p></div>
           </div>
         </section>
@@ -115,11 +115,11 @@
           <div class="auth-intro">
             <p class="eyebrow">Agriculture Threat Fusion</p>
             <h1>Welcome Back, Farmer!</h1>
-            <p>Keep farm records, locations, and activity together. Weather and map details use configured public providers; model suggestions are prototypes.</p>
+            <p>Manage your farm details and get useful crop, weather, and disease guidance.</p>
             <ul>
               <li>Private farm profile and activity</li>
               <li>Map-selected location and live weather</li>
-              <li>Crop image review with prototype AI</li>
+              <li>Crop disease checks with practical guidance</li>
               <li>Simple login with name, phone, or email</li>
               <li>Private farmer records stored in the database</li>
             </ul>
@@ -320,7 +320,7 @@
               <p id="diseaseSelectedFile" class="map-status">No image selected yet. Choose camera or file upload above.</p>
               <img id="diseasePreview" class="disease-preview hidden" alt="Preview of selected crop image" />
               <button class="secondary-btn hidden" id="removeDiseaseImage" type="button">Remove image</button>
-              <p class="map-status">The model will diagnose only the crop you selected when a validated model is available. Unsupported crops will be clearly reported instead of showing another crop's disease. Results include symptoms, treatment guidance, and possible nutrient issues to check; confirm fertilizer needs with a soil test.</p>
+              <p class="map-status">Upload a clear photo of the selected crop to check for possible disease symptoms. Review the suggested treatment and prevention steps. For serious problems, confirm the result with an agricultural expert.</p>
 
               <button class="primary-btn" type="submit">Analyze Crop Disease</button>
             </form>
