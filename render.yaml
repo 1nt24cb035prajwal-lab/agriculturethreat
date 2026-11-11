@@ -15,10 +15,6 @@ services:
         value: "true"
       - key: AGRI_DATABASE_PATH
         value: backend/agriculture.sqlite3
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: OPENAI_VISION_MODEL
-        value: gpt-4.1-mini
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
