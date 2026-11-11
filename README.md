@@ -112,6 +112,6 @@ The farm dashboard retrieves a live seven-day Open-Meteo forecast for saved farm
 
 ## Plant disease detection setup
 
-Disease photo analysis uses the OpenAI vision API through the backend. Add your OpenAI API key as the `OPENAI_API_KEY` environment variable in Render. The optional `OPENAI_VISION_MODEL` setting defaults to `gpt-4.1-mini`. Keep the API key private and never commit it to source control.
+Disease photo classification runs locally on the Render service using the public MobileNetV2 PlantVillage model. It does not require an OpenAI API key, Hugging Face token, or paid inference API. The model covers 38 PlantVillage disease/healthy classes across 14 crops; it may be less reliable on field photos or crops outside those classes.
 
-The assistant provides cautious visual guidance about possible symptoms, treatment, and prevention. It is not a confirmed field diagnosis; farmers should confirm serious problems with a local agricultural expert before applying crop-protection products. The disease page also provides Google Images examples as a visual comparison aid, not as proof of diagnosis.
+The app provides farmer-friendly symptoms, treatment and prevention guidance. It is an AI-assisted suggestion, not a confirmed field diagnosis. Confirm serious problems with a local agricultural expert before applying crop-protection products.
