@@ -203,117 +203,86 @@ class PlantDiseaseModel:
         self._vision_processor = None
         self._vision_model = None
 
-    def _load_vision_model(self):
-        """Load the small public PlantVillage MobileNetV2 model locally (no API key)."""
-        if self._vision_model is None or self._vision_processor is None:
-            import os
-            import torch
-            from transformers import AutoImageProcessor, AutoModelForImageClassification
+    def _analyze_with_gemini(self, image: Image.Image, crop_name: str | None = None):
+        """Analyze a leaf photo using Gemini's free-tier vision API."""
+        import os
+        from google import genai
+        from google.genai import types
 
-            torch.set_num_threads(max(1, min(2, os.cpu_count() or 1)))
-            model_id = "linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification"
-            self._vision_processor = AutoImageProcessor.from_pretrained(model_id)
-            self._vision_model = AutoModelForImageClassification.from_pretrained(model_id)
-            self._vision_model.eval()
-        return self._vision_processor, self._vision_model
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError(
+                "Crop photo analysis is not configured yet. Add a Gemini API key from Google AI Studio as GEMINI_API_KEY in Render."
+            )
 
-    def _classify_image(self, image: Image.Image):
-        """Run CPU-only local inference using the public pretrained MobileNetV2 model."""
-        import torch
-        processor, model = self._load_vision_model()
-        inputs = processor(images=image.convert("RGB"), return_tensors="pt")
-        with torch.inference_mode():
-            logits = model(**inputs).logits[0]
-            probabilities = torch.softmax(logits, dim=-1)
-        scores, indices = torch.topk(probabilities, k=min(5, probabilities.numel()))
-        labels = model.config.id2label
-        return [
-            {"label": str(labels.get(int(index), labels.get(str(int(index)), "unknown"))), "score": float(score)}
-            for score, index in zip(scores.tolist(), indices.tolist())
-        ]
+        buffer = BytesIO()
+        image.convert("RGB").save(buffer, format="JPEG", quality=88, optimize=True)
+        prompt = (
+            "You are a cautious crop-health assistant for farmers. Examine this leaf photo. "
+            "Do not claim certainty from one image. If it is not clearly a plant leaf or evidence is weak, "
+            "return disease_name='Unable to identify clearly' and confidence_level='low'. "
+            "Distinguish visible disease signs from nutrient stress, pest damage, and physical injury. "
+            "Do not prescribe pesticide brands or exact chemical doses. Recommend expert confirmation before spraying. "
+            "Return only JSON with these keys: disease_name, confidence_level (low/medium/high), "
+            "severity (Low/Moderate/High/Needs field inspection), symptoms, treatment, prevention, "
+            "affected_parts (array), alternatives (array), farmer_note. "
+            "Selected crop: " + ((crop_name or "").strip() or "not specified") + "."
+        )
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=buffer.getvalue(), mime_type="image/jpeg"),
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.2,
+            ),
+        )
+        raw = (response.text or "").strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("The crop photo assistant returned an unreadable result. Please try a clearer photo.") from exc
+        if not isinstance(result, dict) or not result.get("disease_name"):
+            raise RuntimeError("The crop photo could not be analysed. Please try another clear leaf photo.")
+        return result
 
     def predict(self, image: Image.Image, crop_name: str | None = None):
-        """Return conservative farmer guidance from a locally hosted image classifier."""
-        predictions = self._classify_image(image)
-        if not predictions:
-            raise RuntimeError("The photo could not be analysed. Please try a clearer leaf photo.")
-
-        def normalize(value):
-            return "".join(ch for ch in str(value).lower() if ch.isalnum())
-
-        def parse_label(item):
-            raw = item["label"]
-            if "___" in raw:
-                crop_raw, disease_raw = raw.split("___", 1)
-            else:
-                crop_raw, disease_raw = "", raw
-            crop_display = PLANT_DISEASE_CROPS.get(crop_raw, crop_raw.replace("_", " ").replace(",", "").replace("(", " ").replace(")", "").strip().title())
-            return crop_raw, crop_display, disease_raw
-
-        selected_crop = (crop_name or "").strip()
-        candidates = predictions
-        if selected_crop:
-            matching = [item for item in predictions if normalize(parse_label(item)[1]) == normalize(selected_crop)]
-            if matching:
-                candidates = matching
-        best = candidates[0]
-        crop_raw, detected_crop, raw_disease = parse_label(best)
-        score = float(best["score"])
-        # Some PlantVillage labels repeat the crop name inside the disease label
-        # (for example Tomato___Tomato_Early_blight); remove that prefix for lookup.
-        disease_clean = raw_disease
-        if crop_raw and disease_clean.lower().startswith(crop_raw.lower() + "_"):
-            disease_clean = disease_clean[len(crop_raw) + 1:]
-        parts = disease_clean.replace("_", " ").strip()
-        disease_key = disease_clean.lower().replace(" ", "_").replace("-", "_")
-        info = DISEASE_CLASS_INFO.get(disease_key)
-        if info:
-            disease_name, symptoms, treatment, severity = info
-        elif "healthy" in disease_key:
-            disease_name = "Healthy-looking leaf"
-            symptoms = "No common PlantVillage disease pattern was identified in this image."
-            treatment = "Continue regular field scouting and maintain balanced crop care."
-            severity = "Low"
-        else:
-            disease_name = parts.replace("  ", " ").title()
-            symptoms = "The model found a visual pattern associated with this class. Check the leaf and the whole plant for matching signs."
-            treatment = "Remove only clearly affected material where appropriate and ask a local agricultural expert to confirm before applying any crop-protection product."
-            severity = "Needs field inspection"
-
-        is_healthy = "healthy" in disease_key
-        needs_review = score < 0.55 or (not info and not is_healthy)
-        if selected_crop and normalize(detected_crop) != normalize(selected_crop):
-            needs_review = True
-        if needs_review:
-            disease_name = "Possible " + disease_name if not is_healthy else disease_name
-            severity = "Needs field inspection"
-
-        alternatives = []
-        for item in predictions[1:4]:
-            _, alt_crop, alt_disease = parse_label(item)
-            alternatives.append(f"{alt_crop}: {alt_disease.replace('_', ' ').title()}")
-
-        summary_crop = detected_crop or selected_crop or "Unspecified crop"
-        warning = (
-            "This is an AI-assisted suggestion from a free, locally running image model trained on PlantVillage-style leaf images. "
-            "It may be less reliable on field photos, unusual varieties, or crops outside its supported classes. "
-            "Confirm serious problems with a local agricultural expert before treatment."
-        )
+        """Return farmer-friendly, cautious disease guidance from Gemini vision."""
+        analysis = self._analyze_with_gemini(image, crop_name)
+        disease = str(analysis.get("disease_name") or "Unable to identify clearly").strip()
+        confidence = str(analysis.get("confidence_level") or "low").lower()
+        needs_review = confidence == "low" or disease.lower() in {
+            "unable to identify clearly", "unknown", "not a plant leaf"
+        }
+        selected_crop = (crop_name or "").strip() or "Unspecified crop"
+        display_disease = "Unable to identify clearly" if needs_review else disease
+        severity = str(analysis.get("severity") or "Needs field inspection")
+        symptoms = str(analysis.get("symptoms") or "The visible signs are not clear enough to describe reliably.")
+        treatment = str(analysis.get("treatment") or "Do not spray based only on this photo. Ask a local agricultural expert to inspect the crop.")
+        prevention = str(analysis.get("prevention") or "Use healthy planting material and inspect the crop regularly.")
+        alternatives = analysis.get("alternatives") if isinstance(analysis.get("alternatives"), list) else []
+        affected_parts = analysis.get("affected_parts") if isinstance(analysis.get("affected_parts"), list) else ["Leaves"]
+        farmer_note = str(analysis.get("farmer_note") or "")
         return {
-            "predictedDisease": f"{summary_crop} — {disease_name}",
-            "diseaseName": disease_name,
-            "detectedCrop": summary_crop,
+            "predictedDisease": f"{selected_crop} — {display_disease}",
+            "diseaseName": display_disease,
+            "detectedCrop": selected_crop,
             "predictionStatus": "needs_review" if needs_review else "prediction",
             "confidence": None,
             "confidencePct": None,
-            "severity": severity,
+            "severity": "Needs field inspection" if needs_review else severity,
             "symptoms": symptoms,
             "treatment": treatment,
-            "prevention": info[2] if info else "Use healthy planting material, maintain field hygiene, avoid prolonged leaf wetness, and monitor the crop regularly.",
-            "affectedCropParts": ["Leaves"],
-            "topPredictions": [{"crop": parse_label(item)[1], "disease": parse_label(item)[2].replace("_", " ").title(), "label": f"{parse_label(item)[1]} — {parse_label(item)[2].replace('_', ' ').title()}"} for item in predictions[:3]],
-            "warning": warning,
-            "modelName": "MobileNetV2 (local)",
+            "prevention": prevention,
+            "affectedCropParts": [str(part) for part in affected_parts][:6],
+            "topPredictions": [{"crop": selected_crop, "disease": str(item), "label": f"{selected_crop} — {item}"} for item in alternatives[:3]],
+            "warning": farmer_note or "This is an AI-assisted visual suggestion, not a confirmed field diagnosis. Confirm serious problems with a local agricultural expert before treatment.",
+            "modelName": "Gemini Vision",
         }
 
     def _build_synthetic_dataset(self):
