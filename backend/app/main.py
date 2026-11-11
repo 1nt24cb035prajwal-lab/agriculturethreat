@@ -646,7 +646,7 @@ async def get_disease_history_image(image_id: str, farmer: dict = Depends(requir
 @app.get("/api/disease/status")
 async def disease_status():
     import os
-    return {"status": "ready" if os.getenv("HF_TOKEN", "").strip() else "setup_required", "model": "MobileNetV2", "provider": "Hugging Face Inference"}
+    return {"status": "ready" if os.getenv("OPENAI_API_KEY", "").strip() else "setup_required", "model": os.getenv("OPENAI_VISION_MODEL", "gpt-4.1-mini"), "provider": "OpenAI Vision"}
 
 
 @app.get("/{page_name}", response_class=HTMLResponse)
