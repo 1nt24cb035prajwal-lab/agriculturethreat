@@ -487,7 +487,7 @@ const analyzeDisease = async (event) => {
 
     const {
       predictedDisease, diseaseName, detectedCrop, severity, symptoms, treatment, prevention,
-      warning, cropName, cropStage, location, affectedCropParts = [], 
+      warning, predictionStatus, cropName, cropStage, location, affectedCropParts = [], 
       nutrientDeficienciesToCheck = [], fertilizerRecommendations = [], nutrientNotice
     } = result.result;
     const cropMismatch = cropName && cropName !== 'Not provided' && detectedCrop
@@ -495,6 +495,24 @@ const analyzeDisease = async (event) => {
         ({ maize: 'corn', corn: 'corn', pepper: 'bellpepper', 'bell pepper': 'bellpepper' }[cropName.toLowerCase()] || cropName.toLowerCase().replace(/[^a-z]/g, ''))
         === detectedCrop.toLowerCase().replace(/[^a-z]/g, '')
       );
+    if (predictionStatus === 'needs_review') {
+      diseaseResult.innerHTML = `
+        <div class="diagnosis-summary">
+          <strong>Crop:</strong> ${escapeHtml(cropName)} · <strong>Growth stage:</strong> ${escapeHtml(cropStage || 'Not provided')}<br>
+          <strong>Result:</strong> Unable to identify the problem clearly
+          <p>We don't want to incorrectly label your crop as healthy or recommend the wrong treatment.</p>
+        </div>
+        <section class="diagnosis-section">
+          <h3>What to do next</h3>
+          <p>${escapeHtml(symptoms)}</p>
+          <p><strong>Suggested next step:</strong> ${escapeHtml(treatment)}</p>
+        </section>
+        <section class="diagnosis-section">
+          <h3>Prevention</h3><p>${escapeHtml(prevention)}</p>
+        </section>`;
+      renderActivity((await api.get('/api/activity')).items);
+      return;
+    }
     const deficiencyMarkup = nutrientDeficienciesToCheck.length
       ? nutrientDeficienciesToCheck.map((item) => `
           <article class="nutrient-card">
@@ -531,7 +549,7 @@ const analyzeDisease = async (event) => {
         <h3>Prevention</h3>
         <p>${escapeHtml(prevention)}</p>
       </section>
-      <small class="diagnosis-warning">${escapeHtml(warning)} Fertilizers correct nutrient shortages; they do not cure fungal, bacterial, or viral diseases.</small>
+      <small class="diagnosis-warning">Image-based guidance is not a confirmed field diagnosis. Fertilizers correct nutrient shortages; they do not cure fungal, bacterial, or viral diseases.</small>
     `;
     renderActivity((await api.get('/api/activity')).items);
   } catch (error) {
