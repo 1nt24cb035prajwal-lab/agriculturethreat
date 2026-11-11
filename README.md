@@ -108,3 +108,12 @@ python backend\scripts\train_disease_model.py
 ```
 
 The farm dashboard retrieves a live seven-day Open-Meteo forecast for saved farm coordinates, including temperature, rainfall probability, rainfall totals, and FAO reference evapotranspiration. It refreshes automatically every 15 minutes and can be refreshed manually.
+
+
+## Plant disease detection setup
+
+Disease photo analysis uses the fine-tuned MobileNetV2 PlantVillage classifier through Hugging Face Inference Providers. Add a fine-grained Hugging Face token with **Make calls to Inference Providers** permission as the `HF_TOKEN` environment variable in the Render service. Do not put the token in source code or commit it.
+
+The model covers the 38 PlantVillage classes across 14 crops; crops outside those classes are not diagnosed by this model. Results are image-based guidance, not a confirmed field diagnosis. The disease page provides a Google Images search link for visual comparison; Google Images is a reference aid and is not used as the model or as proof of diagnosis.
+
+Model reference: https://huggingface.co/linkanjarad/mobilenet_v2_1.0_224-plant-disease-identification
