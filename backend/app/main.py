@@ -646,7 +646,7 @@ async def get_disease_history_image(image_id: str, farmer: dict = Depends(requir
 @app.get("/api/disease/status")
 async def disease_status():
     import os
-    return {"status": "ready", "model": "MobileNetV2", "provider": "Local CPU inference", "apiKeyRequired": False}
+    return {"status": "ready" if os.getenv("GEMINI_API_KEY", "").strip() else "setup_required", "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"), "provider": "Google Gemini Vision", "apiKeyRequired": True}
 
 
 @app.get("/{page_name}", response_class=HTMLResponse)
