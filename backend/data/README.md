@@ -22,34 +22,45 @@ The downloader prefers the Kaggle CLI if it is installed and authenticated; othe
 
 The yield trainer evaluates on later years that are excluded from training and reports MAE, RMSE, R², and the share of predictions within 25% of observed yield. It excludes validation targets above each crop's 99.5th-percentile yield calculated from training years only, and reports the number excluded. It trains on all valid rows after the holdout evaluation, uses the 254 most common districts plus an "other" bucket, and retains all supported crop labels. This is regional historical data, not a farm-level yield benchmark.
 
-## Plant disease images
+## Target plant disease images
 
-- Dataset: PlantVillage, by Mohanty, Hughes, and Salathé (2016)
-- Source: https://huggingface.co/datasets/mohanty/PlantVillage
-- License declared on the Hugging Face dataset card: CC BY-SA 3.0
-- Dataset card describes 54,306 images, 14 crop species, and 26 diseases.
-- Downloaded archive: `plantvillage_data.zip`
-- Extracted folders: `plant_disease/train/<Crop___Disease>/...` and `plant_disease/test/<Crop___Disease>/...`.
+The disease catalog contains these ten class labels:
 
-The downloader extracts only the RGB color images and uses the dataset's published `color_train.txt` and `color_test.txt` manifests. These splits preserve leaf grouping, avoiding the leakage that can occur when images of the same physical leaf are randomly split. Keep the attribution and share-alike terms with any redistributed adapted dataset or model; verify the source terms for your intended use.
+- `Maize___Banded_Leaf_and_Sheath_Blight`
+- `Maize___Downy_Mildew`
+- `Wheat___Foot_and_Root_Rots`
+- `Wheat___Black_Stem_Rust`
+- `Rice___Blast`
+- `Tomato___Early_blight`
+- `Tomato___Fusarium_and_Verticillium_Wilts`
+- `Sugarcane___Red_Rot`
+- `Potato___Black_Scurf`
+- `Finger_millet___Blast`
 
-The trained `backend/models/plant_disease_model.joblib` artifact is included in this repository. It is an adaptation trained from PlantVillage and is distributed under CC BY-SA 3.0. Attribution: Mohanty, Hughes, and Salathé (2016), PlantVillage ([dataset card](https://huggingface.co/datasets/mohanty/PlantVillage)); see the [CC BY-SA 3.0 license](https://creativecommons.org/licenses/by-sa/3.0/).
+The supplied ZIP contains one reference image per class, with numbered filenames mapped by `backend/scripts/train_disease_model.py`. Train the reference matcher by passing the ZIP path:
+
+```powershell
+python backend\scripts\train_disease_model.py "C:\path\to\dataset_@1.zip"
+```
+
+The script uses only those ten mapped images and writes `backend/models/plant_disease_reference_model.joblib`. At runtime, uploads are matched to the closest reference using cosine similarity over image features. The displayed percentage is visual similarity, not disease confidence, probability, or measured accuracy; this one-shot prototype always returns a closest class, including for unrelated images. Ten images cannot validate a >95% accuracy claim. More labeled field photos and an independent representative test set are required for that.
+
+The compact reference feature artifact is included for deployment. PlantVillage is no longer downloaded or used by the disease workflow; any existing local PlantVillage files are left untouched.
 
 ## Train the models
 
-After the downloads and image preparation finish:
+After downloading the crop and yield datasets, run the crop and yield trainers. Train the ten-image disease reference matcher separately using the ZIP command above.
 
 ```powershell
 python backend\scripts\train_crop_model.py
 python backend\scripts\train_yield_model.py
-python backend\scripts\train_disease_model.py
 ```
 
-The resulting model files are written to `backend/models/`. The trained disease model is versioned with Git LFS; the other generated model files are excluded from Git. Each developer or deployment can download the datasets and train locally, or store model artifacts in an appropriate model registry.
+The crop and yield model files are written to `backend/models/` and excluded from Git. The reference disease artifact contains image feature vectors, not the original images.
 
 ## Important limitations
 
-PlantVillage is a controlled-image research benchmark. The disease model uses HOG and color-histogram features with a linear classifier, not a field-validated diagnostic CNN. Its published split score must not be treated as field diagnostic accuracy. Confirm disease and treatment with an agricultural expert.
+The disease application uses Gemini Vision unless the ten-image reference artifact is present. The reference matcher uses HOG and color-histogram features with cosine similarity; it is not a field-validated diagnostic model. Its visual-similarity score must not be treated as diagnostic confidence or measured accuracy. Confirm disease and treatment with an agricultural expert.
 
 
 ## Additional crop-disease dataset: Sugarcane
@@ -57,11 +68,11 @@ PlantVillage is a controlled-image research benchmark. The disease model uses HO
 - Dataset: [Sugarcane Leaf Disease Classification](https://huggingface.co/datasets/Project-AgML/sugarcane_leaf_disease_classification), based on Thite et al. (2024), DOI: 10.1016/j.dib.2024.110268.
 - License declared by the dataset card: CC BY 4.0. Retain attribution to Thite, Suryawanshi, Patil, and Chumchu.
 - Contains 6,748 field-collected images in 11 classes: Banded Chlorosis, Brown Spot, Brown Rust, Dried, Grassy Shoot, Healthy, Pokkah Boeng, Sett Rot, Smut, Viral Disease, and Yellow Leaf.
-- The preparation script stores this as Sugarcane___<class> folders alongside PlantVillage classes, with a stratified 80/20 split. This is a random split because the dataset provides a single training split; it is not an author-provided independent test set.
+- The preparation script stores this as Sugarcane___<class> folders with a stratified 80/20 split. This is a random split because the dataset provides a single training split; it is not an author-provided independent test set.
 - Install training-only dependencies with: python -m pip install -r backend/training-requirements.txt
-- Run: python backend/scripts/prepare_sugarcane_dataset.py, then python backend/scripts/train_disease_model.py.
+- Run: python backend/scripts/prepare_sugarcane_dataset.py. This dataset preparation does not retrain the current Gemini or ten-reference disease modes.
 
-**Coverage warning:** this adds Sugarcane; it does not yet provide validated disease datasets for every crop in the website's 24-crop selector. The current PlantVillage model plus this dataset must not be advertised as supporting all 24 crops. Rice, Wheat, Cotton, Groundnut, Onion, Coconut, Arecanut, Ragi, Jowar, Bajra, Sunflower, Mustard, Chilli, Brinjal, Cabbage, Cauliflower, Banana, Mango, and other crops require their own verified image coverage and crop-specific evaluation before activation. A crop absent from the trained class list remains unsupported.
+**Coverage warning:** this adds Sugarcane source data but does not train the current classifier. Do not treat dataset presence as validated model support for the website's crops.
 
 
 ## 15-crop / 45-disease dataset (FC45DHLPD)
@@ -70,7 +81,8 @@ PlantVillage is a controlled-image research benchmark. The disease model uses HO
 - Author: Anand Kumar Jain and contributors; dataset institutions include MNIT Jaipur, Bikaner Technical University, and Kota Agriculture University / Rajasthan Agriculture Department.
 - Published description lists Cashew, Cassava, Tomato, Potato, Maize, Papaya, Sugarcane, Rice, Chilli, Grapes, Citrus, Groundnut, Cotton, Wheat, and Soyabean. The ZIP is about 4.15 GB. Licence: CC BY 4.0. Cite the dataset and retain attribution.
 - Download and prepare: `python backend/scripts/prepare_fc45_dataset.py`. If the automatic public API download fails, download the ZIP from the Mendeley page and run `python backend/scripts/prepare_fc45_dataset.py --archive "C:\\path\\to\\15 Crop 45 Disease and Healthy Leaf dataset.zip"`.
-- Then train: `python backend/scripts/train_disease_model.py`. The script combines the new class folders with the existing PlantVillage and Sugarcane folders under `backend/data/plant_disease/train` and `test`.
+- These prepared images are not used by the Gemini or ten-reference disease modes.
 - The prepared FC45 images are stored as local links/copies under the data directory. Do not commit the ZIP or extracted images to Git; they are multi-gigabyte data assets. The downloader emits `fc45_dataset_report.json` with detected classes and counts.
 - The published title describes 15 crops and 45 disease/healthy categories; the preparation script reports the actual folder-derived crop and class counts instead of assuming a specific class count. Check that all 15 crops and expected classes are recognized before training.
-- The existing HOG + colour histogram SGD classifier is a lightweight baseline. It is not a modern deep-learning model and should be validated on independent field photos before being used for farm decisions. A random image split may contain near-duplicates; do not present its score as field accuracy.
+- Do not present dataset preparation or image-folder counts as measured model accuracy.
+The disease reference matcher uses HOG and color-histogram features with cosine similarity, not a field-validated diagnostic CNN. Its similarity score must not be treated as diagnostic confidence. Confirm disease and treatment with an agricultural expert; fertilizer recommendations are not cures and should be based on soil tests.

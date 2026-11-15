@@ -59,7 +59,7 @@ External integrations remain unavailable until their provider credentials and su
 
 ## Download datasets and train models
 
-From the repository root, install the backend dependencies and download both datasets:
+From the repository root, install the backend dependencies and download the crop and yield datasets:
 
 ```powershell
 .\\.venv\\Scripts\\python.exe -m pip install -r backend\\requirements.txt
@@ -70,23 +70,31 @@ The downloader prepares:
 
 - `backend/data/crop_recommendation.csv`: the 2,200-row crop recommendation dataset with N, P, K, temperature, humidity, pH, rainfall, and crop label columns. It prefers the Kaggle CLI if configured and otherwise uses a public Hugging Face CSV mirror.
 - `backend/data/india_crop_production.csv`: historical state/district/crop/season/area/production records used to derive yield in tonnes per hectare.
-- `backend/data/plantvillage_data.zip` and `backend/data/plant_disease/train/<Crop___Disease>/...` plus `test/<Crop___Disease>/...`: the PlantVillage color images (about 2.2 GB) arranged using the published train/test manifests.
 
-Train the crop recommendation model and disease image model:
+Train the crop recommendation and yield models:
 
 ```powershell
 .\\.venv\\Scripts\\python.exe backend\\scripts\\train_crop_model.py
 .\\.venv\\Scripts\\python.exe backend\\scripts\\train_yield_model.py
-.\\.venv\\Scripts\\python.exe backend\\scripts\\train_disease_model.py
 ```
 
-The crop trainer validates the eight required columns, requires at least 30 labelled rows and two crop classes, performs a stratified 80/20 hold-out split, reports validation accuracy, and writes `backend/models/crop_recommendation_model.joblib`. The yield trainer holds out the latest years, reports MAE, RMSE, R², and a within-25%-of-observed rate, and writes `backend/models/yield_prediction_model.joblib`. The disease trainer uses PlantVillage's published color train/test manifests (which preserve the dataset's leaf grouping), reports test accuracy and macro-F1, and writes `backend/models/plant_disease_model.joblib`. The app loads trained models when available. The crop and yield model files are generated locally; the trained disease model is included in Git. See [backend/data/README.md](backend/data/README.md) for its attribution and license.
+The crop trainer validates the eight required columns, requires at least 30 labelled rows and two crop classes, performs a stratified 80/20 hold-out split, reports validation accuracy, and writes `backend/models/crop_recommendation_model.joblib`. The yield trainer holds out the latest years, reports MAE, RMSE, R², and a within-25%-of-observed rate, and writes `backend/models/yield_prediction_model.joblib`. The app loads trained models when available. The crop and yield model files are generated locally.
 
-Dataset archives and generated crop and yield model files are excluded from Git to avoid committing large data or build artifacts. The download script and source/licence details are tracked in the repository; run the downloader after cloning. See [backend/data/README.md](backend/data/README.md).
+To build the ten-photo disease reference prototype, pass the supplied ZIP to the trainer:
 
-The PlantVillage dataset card declares CC BY-SA 3.0 and describes 54,306 images across 14 crop species and 26 diseases. Retain attribution and review share-alike terms before redistributing adapted data or models. The yield dataset mirror marks its license unknown; check the original Kaggle terms before redistribution or commercial use.
+```powershell
+.\\.venv\\Scripts\\python.exe backend\\scripts\\train_disease_model.py "C:\\path\\to\\dataset_@1.zip"
+```
 
-**Model limitations:** the crop recommendation dataset is a benchmark and does not guarantee crop suitability in a specific field. Yield estimates use regional historical production records, do not include weather, variety, soil, or farm-level observations, and report temporal holdout metrics for transparency. PlantVillage images are controlled research images; the disease classifier is not a field-validated CNN, and diagnoses should be confirmed by an agricultural expert.
+This writes `backend/models/plant_disease_reference_model.joblib`. The app matches uploads to the closest of one reference image per disease and reports visual similarity—not diagnostic confidence or measured accuracy.
+
+Dataset archives and generated crop and yield model files are excluded from Git to avoid committing large data or build artifacts. The compact ten-image reference feature artifact is included for deployment. The downloader no longer downloads PlantVillage; existing local PlantVillage files are left untouched and unused. See [backend/data/README.md](backend/data/README.md).
+
+The yield dataset mirror marks its license unknown; check the original Kaggle terms before redistribution or commercial use.
+
+**Disease-model limitations:** the app includes symptom, management, and fertilizer guidance for the ten requested diseases and matches images against one reference photo per disease. Its visual-similarity percentage is not diagnostic confidence; the matcher always returns the closest class, even for an unrelated image. Ten total images cannot validate a >95% accuracy claim. That requires a representative, independently held-out field dataset and measured evaluation. Fertilizer advice is not a disease cure; confirm diagnosis and nutrient needs with a local agricultural expert and soil test.
+
+**Other model limitations:** the crop recommendation dataset is a benchmark and does not guarantee crop suitability in a specific field. Yield estimates use regional historical production records, do not include weather, variety, soil, or farm-level observations, and report temporal holdout metrics for transparency.
 
 ## Tests
 
@@ -98,14 +106,7 @@ The GitHub Actions workflow runs the backend regression tests on pull requests.
 
 ## Disease detection and weather forecast
 
-The disease classifier uses the PlantVillage RGB image benchmark and predicts crop-specific classes (38 labels across 14 crop species). The checked-in trained model reports 54,305 labelled images, 10,709 held-out test images, 76.9% held-out accuracy, and 71.8% macro-F1. These are controlled-dataset metrics, not guaranteed field accuracy. The app displays the crop/disease class, top model matches, symptoms, and conservative integrated pest-management guidance. If the trained model is unavailable, the app does not silently substitute synthetic predictions.
-
-To retrain after downloading the PlantVillage dataset, run:
-
-```powershell
-python backend\scripts\download_datasets.py --skip-crop --skip-yield
-python backend\scripts\train_disease_model.py
-```
+Disease photo analysis uses Gemini Vision when the local ten-image reference model is absent. If `backend/models/plant_disease_reference_model.joblib` is present, uploads are matched to the closest of its ten reference photos instead. That prototype reports image-feature similarity only; it is not disease confidence, probability, or measured accuracy and always chooses a closest class.
 
 The farm dashboard retrieves a live seven-day Open-Meteo forecast for saved farm coordinates, including temperature, rainfall probability, rainfall totals, and FAO reference evapotranspiration. It refreshes automatically every 15 minutes and can be refreshed manually.
 
@@ -116,3 +117,5 @@ The farm dashboard retrieves a live seven-day Open-Meteo forecast for saved farm
 Disease photo analysis uses Google's Gemini vision API with the `gemini-2.5-flash-lite` model. This avoids loading a large local PyTorch model and helps the app fit smaller web-service memory limits. Create a free-tier API key in Google AI Studio and add it to Render as `GEMINI_API_KEY`. The optional `GEMINI_MODEL` setting defaults to `gemini-2.5-flash-lite`.
 
 Google's Gemini API free tier has model-specific rate limits and availability; usage is not unlimited. Review Google's current pricing and rate-limit pages before using the app with many users. The assistant provides cautious visual guidance, not a confirmed field diagnosis.
+
+To use the optional local ten-reference prototype instead, train it with `python backend\scripts\train_disease_model.py "C:\path\to\dataset_@1.zip"`. When the generated model artifact is present, it takes precedence over Gemini. Its similarity percentage must not be presented as diagnostic confidence.

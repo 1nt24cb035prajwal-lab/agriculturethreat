@@ -487,14 +487,39 @@ const analyzeDisease = async (event) => {
 
     const {
       predictedDisease, diseaseName, detectedCrop, severity, symptoms, treatment, prevention,
-      warning, predictionStatus, cropName, cropStage, location, affectedCropParts = [], 
-      nutrientDeficienciesToCheck = [], fertilizerRecommendations = [], nutrientNotice
+      warning, predictionStatus, cropName, cropStage, location, affectedCropParts = [],
+      nutrientDeficienciesToCheck = [], fertilizerRecommendations = [], nutrientNotice,
+      scoreType, similarityPct, causalAgent, fertilizerAdvice
     } = result.result;
     const cropMismatch = cropName && cropName !== 'Not provided' && detectedCrop
       && !(
         ({ maize: 'corn', corn: 'corn', pepper: 'bellpepper', 'bell pepper': 'bellpepper' }[cropName.toLowerCase()] || cropName.toLowerCase().replace(/[^a-z]/g, ''))
         === detectedCrop.toLowerCase().replace(/[^a-z]/g, '')
       );
+    if (scoreType === 'reference_similarity') {
+      diseaseResult.innerHTML = `
+        <div class="diagnosis-summary">
+          <strong>Crop:</strong> ${escapeHtml(cropName)} · <strong>Growth stage:</strong> ${escapeHtml(cropStage || 'Not provided')}<br>
+          <strong>Closest reference:</strong> ${escapeHtml(predictedDisease)}<br>
+          ${causalAgent ? `<strong>Causal agent:</strong> ${escapeHtml(causalAgent)}<br>` : ''}
+          <strong>Visual similarity (not confidence):</strong> ${similarityPct}%<br>
+          <strong>Farm location:</strong> ${escapeHtml([location.village, location.district, location.state].filter(Boolean).join(', ') || 'Not provided')}
+          ${cropMismatch ? `<p class="diagnosis-warning">Crop mismatch: selected ${escapeHtml(cropName)}, but the closest reference is ${escapeHtml(detectedCrop)}.</p>` : ''}
+        </div>
+        <section class="diagnosis-section">
+          <h3>Symptoms and affected plant parts</h3>
+          <p>${escapeHtml(symptoms)}</p>
+        </section>
+        <section class="diagnosis-section">
+          <h3>Guidance if this closest reference is relevant</h3>
+          <p>${escapeHtml(treatment)}</p>
+          <h3>Prevention</h3><p>${escapeHtml(prevention)}</p>
+          <h3>Fertilizer guidance</h3><p>${escapeHtml(fertilizerAdvice || nutrientNotice || 'Confirm nutrient needs with a soil test.')}</p>
+        </section>
+        <small class="diagnosis-warning">${escapeHtml(warning)}</small>`;
+      renderActivity((await api.get('/api/activity')).items);
+      return;
+    }
     if (predictionStatus === 'needs_review') {
       const referenceCrop = detectedCrop || cropName || 'plant';
       const reviewGoogleUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(`${referenceCrop} plant leaf disease symptoms reference`)}`;
@@ -906,5 +931,4 @@ document.getElementById('downloadReportButton').addEventListener('click', async 
 });
 
 renderCurrentPage();
-
 

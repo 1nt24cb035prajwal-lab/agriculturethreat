@@ -2,24 +2,16 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 import shutil
 import subprocess
 import sys
 import urllib.request
-import zipfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "backend" / "data"
 CROP_CSV = DATA_DIR / "crop_recommendation.csv"
 YIELD_CSV = DATA_DIR / "india_crop_production.csv"
-PLANT_ZIP = DATA_DIR / "plantvillage_data.zip"
-PLANT_ZIP_ALTERNATE = DATA_DIR / "plantvillage" / "data.zip"
-PLANT_DIR = DATA_DIR / "plant_disease"
-PLANT_PREPARED_MARKER = PLANT_DIR / ".prepared.json"
-SPLIT_DIR = DATA_DIR / "plantvillage_splits"
-
 CROP_MIRROR_URL = (
     "https://huggingface.co/datasets/liaad/agricultural-data/"
     "resolve/main/Crop_recommendation.csv"
@@ -28,16 +20,9 @@ YIELD_DATASET_URL = (
     "https://huggingface.co/datasets/jason1966/"
     "abhinand05_crop-production-in-india/resolve/main/crop_production.csv"
 )
-PLANT_REPO = "https://huggingface.co/datasets/mohanty/PlantVillage/resolve/main"
-PLANT_VILLAGE_URL = f"{PLANT_REPO}/data.zip"
-SPLIT_URLS = {
-    "train": f"{PLANT_REPO}/splits/color_train.txt",
-    "test": f"{PLANT_REPO}/splits/color_test.txt",
-}
 REQUIRED_CROP_COLUMNS = [
     "N", "P", "K", "temperature", "humidity", "ph", "rainfall", "label"
 ]
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
 def download_file(url: str, destination: Path, force: bool = False) -> None:
@@ -133,108 +118,12 @@ def download_yield_dataset(force: bool = False) -> None:
     print(f"Validated India crop production CSV: {rows:,} rows")
 
 
-def _read_split(path: Path) -> list[str]:
-    with path.open("r", encoding="utf-8") as handle:
-        return [line.strip().replace("\\", "/") for line in handle if line.strip()]
-
-
-def extract_plantvillage(force: bool = False) -> None:
-    train_dir = PLANT_DIR / "train"
-    test_dir = PLANT_DIR / "test"
-    if PLANT_PREPARED_MARKER.is_file() and not force:
-        prepared = json.loads(PLANT_PREPARED_MARKER.read_text(encoding="utf-8"))
-        actual_counts = {
-            "train": sum(1 for path in train_dir.rglob("*") if path.suffix.lower() in IMAGE_EXTENSIONS),
-            "test": sum(1 for path in test_dir.rglob("*") if path.suffix.lower() in IMAGE_EXTENSIONS),
-        }
-        if actual_counts == prepared.get("image_counts"):
-            print(f"PlantVillage train/test folders already exist: {PLANT_DIR}")
-            return
-
-    archive_path = next(
-        (path for path in (PLANT_ZIP, PLANT_ZIP_ALTERNATE) if path.is_file()),
-        PLANT_ZIP,
-    )
-    download_file(PLANT_VILLAGE_URL, archive_path, force=force)
-    if not zipfile.is_zipfile(archive_path):
-        raise ValueError(f"PlantVillage download is not a valid ZIP file: {archive_path}")
-
-    SPLIT_DIR.mkdir(parents=True, exist_ok=True)
-    split_paths = {}
-    for split_name, url in SPLIT_URLS.items():
-        split_path = SPLIT_DIR / f"color_{split_name}.txt"
-        download_file(url, split_path, force=force)
-        split_paths[split_name] = _read_split(split_path)
-
-    if PLANT_DIR.exists():
-        shutil.rmtree(PLANT_DIR)
-    for split_name in ("train", "test"):
-        (PLANT_DIR / split_name).mkdir(parents=True, exist_ok=True)
-
-    copied = {"train": 0, "test": 0}
-    classes = {"train": set(), "test": set()}
-    with zipfile.ZipFile(archive_path) as archive:
-        members = {}
-        for info in archive.infolist():
-            normalized = PurePosixPath(info.filename).as_posix().lstrip("./")
-            members[normalized] = info
-
-        for split_name, file_list in split_paths.items():
-            for relative_name in file_list:
-                member = members.get(relative_name)
-                if member is None:
-                    # Some ZIP writers add a single wrapper directory.
-                    member = next(
-                        (
-                            info for name, info in members.items()
-                            if name.endswith("/" + relative_name)
-                        ),
-                        None,
-                    )
-                if member is None:
-                    raise FileNotFoundError(
-                        f"PlantVillage image listed in {split_name} split was not found: {relative_name}"
-                    )
-
-                parts = PurePosixPath(relative_name).parts
-                if len(parts) < 4 or parts[0] != "raw" or parts[1] != "color":
-                    raise ValueError(f"Unexpected PlantVillage color image path: {relative_name}")
-                class_name = parts[2]
-                if "___" not in class_name:
-                    raise ValueError(f"PlantVillage class label is missing crop/disease separator: {class_name}")
-                image_relative = Path(*parts[3:])
-                target = (PLANT_DIR / split_name / class_name / image_relative).resolve()
-                if not target.is_relative_to(PLANT_DIR.resolve()):
-                    raise ValueError(f"Unsafe path in PlantVillage archive: {relative_name}")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                with archive.open(member) as source, target.open("wb") as output:
-                    shutil.copyfileobj(source, output, length=1024 * 1024)
-                copied[split_name] += 1
-                classes[split_name].add(class_name)
-
-    if copied["train"] < 30 or copied["test"] < 10 or classes["train"] != classes["test"]:
-        shutil.rmtree(PLANT_DIR, ignore_errors=True)
-        raise ValueError(
-            "PlantVillage archive did not contain matching train/test class folders. "
-            "The download may be incomplete or its layout may have changed."
-        )
-    print(
-        f"Prepared PlantVillage color split: {copied['train']:,} train images, "
-        f"{copied['test']:,} test images, {len(classes['train'])} classes"
-    )
-    PLANT_PREPARED_MARKER.write_text(
-        json.dumps({"image_counts": copied, "classes": len(classes["train"])}),
-        encoding="utf-8",
-    )
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Download the crop recommendation CSV and PlantVillage color images."
+        description="Download crop recommendation and crop production datasets."
     )
     parser.add_argument("--skip-crop", action="store_true")
     parser.add_argument("--skip-yield", action="store_true")
-    parser.add_argument("--skip-disease", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
@@ -242,12 +131,10 @@ def main() -> int:
         download_crop_dataset(force=args.force)
     if not args.skip_yield:
         download_yield_dataset(force=args.force)
-    if not args.skip_disease:
-        extract_plantvillage(force=args.force)
-
     print("\nDataset preparation complete.")
     print("Train crop model:    python backend/scripts/train_crop_model.py")
-    print("Train disease model: python backend/scripts/train_disease_model.py")
+    print("For the ten-photo reference prototype, run train_disease_model.py with the reference ZIP.")
+    print("That prototype reports visual similarity only; it does not establish diagnostic accuracy.")
     return 0
 
 

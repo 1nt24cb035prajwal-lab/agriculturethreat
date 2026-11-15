@@ -23,32 +23,142 @@ DISEASE_INFO = {
         "symptoms": "No visible disease symptoms detected.",
         "treatment": "Continue regular irrigation and crop health monitoring.",
         "prevention": "Maintain balanced nutrition and monitor pest activity.",
+        "fertilizerAdvice": "Use a soil-test-based balanced fertilizer plan; fertilizer does not treat plant disease.",
     },
     "Leaf Spot": {
         "severity": "Moderate",
         "symptoms": "Small circular lesions with yellow halos on leaves.",
         "treatment": "Apply a recommended fungicide and remove severely infected leaves.",
         "prevention": "Improve spacing, avoid overhead watering, and mulch affected debris.",
+        "fertilizerAdvice": "Use a soil-test-based balanced fertilizer plan; fertilizer does not treat plant disease.",
     },
     "Rust": {
         "severity": "High",
         "symptoms": "Orange-brown pustules and leaf yellowing.",
         "treatment": "Use disease-resistant varieties and apply protective fungicide early.",
         "prevention": "Reduce high humidity, improve airflow, and avoid excess nitrogen.",
+        "fertilizerAdvice": "Avoid excess nitrogen and follow soil-test recommendations; fertilizer does not cure rust.",
     },
     "Blight": {
         "severity": "High",
         "symptoms": "Dark lesions with rapid spreading patterns on leaves and stems.",
         "treatment": "Spray targeted fungicide and quarantine infected plants.",
         "prevention": "Early scouting and field sanitation reduce spread.",
+        "fertilizerAdvice": "Use a soil-test-based balanced fertilizer plan; fertilizer does not treat blight.",
     },
     "Mosaic": {
         "severity": "Moderate",
         "symptoms": "Mottled light and dark patterns on leaves.",
         "treatment": "Remove infected crops and monitor vector control.",
         "prevention": "Use clean seed and maintain insect control around field edges.",
+        "fertilizerAdvice": "Use a soil-test-based balanced fertilizer plan; fertilizer does not cure viral disease.",
     },
 }
+
+TARGET_DISEASES = {
+    "Maize___Banded_Leaf_and_Sheath_Blight": {
+        "crop": "Maize",
+        "name": "Banded Leaf and Sheath Blight",
+        "causalAgent": "Rhizoctonia solani",
+        "severity": "High",
+        "symptoms": "White lesions develop into alternating brown and gray bands on lower leaves and sheaths; developing cobs may crack.",
+        "treatment": "Strip off affected lower leaves and sheaths. Reduce excessive planting density and use resistant varieties.",
+        "prevention": "Maintain recommended plant spacing and scout lower leaves and sheaths regularly.",
+        "fertilizerAdvice": "No fertilizer cures this fungal disease. Avoid excess nitrogen and apply nutrients according to a soil test.",
+    },
+    "Maize___Downy_Mildew": {
+        "crop": "Maize",
+        "name": "Downy Mildew",
+        "causalAgent": "Downy mildew pathogen",
+        "severity": "High",
+        "symptoms": "Pale yellow leaf streaks, stunted growth, and white downy growth on the underside of leaves.",
+        "treatment": "Use locally registered metalaxyl-treated seed before sowing and remove infected plants early.",
+        "prevention": "Use healthy seed and inspect seedlings early; follow local pesticide labels and regulations.",
+        "fertilizerAdvice": "No fertilizer cures downy mildew. Use balanced, soil-test-based nutrition and avoid excess nitrogen.",
+    },
+    "Wheat___Foot_and_Root_Rots": {
+        "crop": "Wheat",
+        "name": "Foot and Root Rots",
+        "causalAgent": "Bipolaris sorokiniana and Oculimacula species",
+        "severity": "Moderate to high",
+        "symptoms": "Discoloration and decay at the subcrown internode and lower stems can cause stunting, fewer tillers, or premature ripening.",
+        "treatment": "Confirm the cause in the field; use clean seed and rotate away from susceptible cereals where practical.",
+        "prevention": "Use locally recommended varieties and maintain crop rotation and field drainage.",
+        "fertilizerAdvice": "Correct documented nutrient deficiencies using a soil test; fertilizer does not cure root rot.",
+    },
+    "Wheat___Black_Stem_Rust": {
+        "crop": "Wheat",
+        "name": "Black (Stem) Rust",
+        "causalAgent": "Puccinia graminis",
+        "severity": "High",
+        "symptoms": "Dark reddish-brown pustules break through tissues on leaves, stems, and spikes.",
+        "treatment": "Use resistant varieties and seek local crop-protection advice promptly when rust is detected.",
+        "prevention": "Scout stems and spikes and follow regional rust monitoring and variety recommendations.",
+        "fertilizerAdvice": "Avoid excessive nitrogen; apply balanced nutrients based on soil tests. Fertilizer does not cure rust.",
+    },
+    "Rice___Blast": {
+        "crop": "Rice",
+        "name": "Rice Blast",
+        "causalAgent": "Pyricularia oryzae",
+        "severity": "High",
+        "symptoms": "Eye- or diamond-shaped leaf spots with gray centers; panicle-neck rot can leave grains empty.",
+        "treatment": "Use locally recommended resistant varieties and promptly consult extension guidance for registered controls.",
+        "prevention": "Use clean seed, monitor leaves and panicles, and avoid excessive nitrogen application.",
+        "fertilizerAdvice": "Avoid excess nitrogen and split applications according to local soil-test recommendations; fertilizer is not a blast treatment.",
+    },
+    "Tomato___Early_blight": {
+        "crop": "Tomato",
+        "name": "Early Blight",
+        "causalAgent": "Alternaria species",
+        "severity": "Moderate",
+        "symptoms": "Dark brown or black spots with concentric rings, usually on lower leaves, stems, or fruit; leaves may yellow.",
+        "treatment": "Remove infected lower leaves, improve airflow, and use only locally registered fungicides according to the label.",
+        "prevention": "Reduce leaf wetness, maintain spacing, and remove infected plant debris.",
+        "fertilizerAdvice": "Maintain balanced nutrition based on a soil test; fertilizer does not cure early blight.",
+    },
+    "Tomato___Fusarium_and_Verticillium_Wilts": {
+        "crop": "Tomato",
+        "name": "Fusarium and Verticillium Wilts",
+        "causalAgent": "Fusarium and Verticillium species",
+        "severity": "High",
+        "symptoms": "Leaves yellow and wilt, often first on one side or on lower branches, as water-conducting vessels are affected.",
+        "treatment": "There is no cure for infected plants. Remove and destroy them; plant resistant cultivars marked F or V.",
+        "prevention": "Use resistant cultivars and clean planting material; avoid moving contaminated soil between fields.",
+        "fertilizerAdvice": "Fertilizer cannot cure vascular wilt. Use soil-test-based nutrition and avoid over-fertilizing stressed plants.",
+    },
+    "Sugarcane___Red_Rot": {
+        "crop": "Sugarcane",
+        "name": "Red Rot",
+        "causalAgent": "Colletotrichum falcatum",
+        "severity": "High",
+        "symptoms": "Upper leaves droop and yellow; split stalks show red tissue with white cross-bands and may have a sour or foul odor.",
+        "treatment": "Do not use infected stalks as seed cane; remove infected clumps and use resistant varieties and healthy setts.",
+        "prevention": "Select clean seed cane and inspect stalks before planting.",
+        "fertilizerAdvice": "No fertilizer cures red rot. Apply nutrients according to soil tests and local sugarcane recommendations.",
+    },
+    "Potato___Black_Scurf": {
+        "crop": "Potato",
+        "name": "Black Scurf",
+        "causalAgent": "Rhizoctonia solani",
+        "severity": "Moderate",
+        "symptoms": "Hard black sclerotia remain attached to harvested tubers; stem and stolon cankers may occur early in the season.",
+        "treatment": "Use clean seed tubers and locally approved seed disinfection; rotate with non-host crops.",
+        "prevention": "Plant healthy seed tubers and avoid repeatedly planting potatoes in the same field.",
+        "fertilizerAdvice": "No fertilizer cures black scurf. Base nutrient applications on soil tests and avoid excess nitrogen.",
+    },
+    "Finger_millet___Blast": {
+        "crop": "Finger millet (ragi)",
+        "name": "Finger Millet Blast",
+        "causalAgent": "Pyricularia grisea (Magnaporthe oryzae)",
+        "severity": "High",
+        "symptoms": "Blast can affect finger millet from nursery through the main field, including leaves, necks, and fingers.",
+        "treatment": "Remove badly affected plants and seek local extension advice for regionally registered control measures.",
+        "prevention": "Use healthy seed and locally recommended resistant varieties; scout nursery and field crops.",
+        "fertilizerAdvice": "Avoid excess nitrogen and follow soil-test-based nutrient recommendations; fertilizer does not cure blast.",
+    },
+}
+
+DISEASE_INFO.update(TARGET_DISEASES)
 
 
 # PlantVillage labels are crop-specific. Keep the raw dataset label for traceability,
@@ -197,8 +307,9 @@ class PlantDiseaseModel:
         self.model_dir = base_dir / "models"
         self.model_dir.mkdir(exist_ok=True)
         self.model_path = self.model_dir / "plant_disease_model.joblib"
+        self.reference_model_path = self.model_dir / "plant_disease_reference_model.joblib"
         self.dataset_path = self.model_dir / "plant_disease_dataset.json"
-        self.image_dataset_path = base_dir / "data" / "plant_disease"
+        self.image_dataset_path = base_dir / "data" / "disease_training"
         self.model = None
         self._vision_processor = None
         self._vision_model = None
@@ -251,8 +362,55 @@ class PlantDiseaseModel:
             raise RuntimeError("The crop photo could not be analysed. Please try another clear leaf photo.")
         return result
 
+    def _predict_reference_image(self, image: Image.Image):
+        loaded = self.load_or_train()
+        if not isinstance(loaded, dict) or loaded.get("kind") != "plant_disease_reference_v1":
+            raise RuntimeError("The reference disease model artifact is invalid.")
+
+        feature = self._extract_image_features(image)
+        feature_norm = max(float(np.linalg.norm(feature)), 1e-12)
+        reference_features = loaded["features"]
+        reference_norms = np.maximum(np.linalg.norm(reference_features, axis=1), 1e-12)
+        similarities = reference_features @ feature / (reference_norms * feature_norm)
+        predicted_index = int(np.argmax(similarities))
+        label = str(loaded["classes"][predicted_index])
+        info = TARGET_DISEASES[label]
+        similarity_pct = int(round(float(np.clip(similarities[predicted_index], 0, 1)) * 100))
+        crop = str(info["crop"])
+        disease_name = str(info["name"])
+        return {
+            "predictedDisease": f"{crop} — {disease_name}",
+            "diseaseName": disease_name,
+            "detectedCrop": crop,
+            "predictionStatus": "prediction",
+            "confidence": None,
+            "confidencePct": None,
+            "confidenceStatus": "Not available; reference similarity is not diagnostic confidence.",
+            "scoreType": "reference_similarity",
+            "scorePct": similarity_pct,
+            "similarityPct": similarity_pct,
+            "targetDiseaseSupported": True,
+            "causalAgent": info["causalAgent"],
+            "severity": info["severity"],
+            "symptoms": info["symptoms"],
+            "treatment": info["treatment"],
+            "prevention": info["prevention"],
+            "fertilizerAdvice": info["fertilizerAdvice"],
+            "affectedCropParts": ["Leaves", "stems"],
+            "topPredictions": [{"crop": crop, "disease": disease_name, "label": f"{crop} — {disease_name}"}],
+            "warning": (
+                "Prototype uses one reference image per disease. This visual similarity is not "
+                "diagnostic confidence or measured accuracy; it always returns the closest of "
+                "the ten references. Confirm the disease with an agricultural expert."
+            ),
+            "modelName": "Ten-image reference matcher",
+        }
+
     def predict(self, image: Image.Image, crop_name: str | None = None):
-        """Return farmer-friendly, cautious disease guidance from Gemini vision."""
+        """Use the local reference matcher when available; otherwise use Gemini vision."""
+        if self.reference_model_path.is_file():
+            return self._predict_reference_image(image)
+
         analysis = self._analyze_with_gemini(image, crop_name)
         disease = str(analysis.get("disease_name") or "Unable to identify clearly").strip()
         confidence = str(analysis.get("confidence_level") or "low").lower()
@@ -328,7 +486,7 @@ class PlantDiseaseModel:
         features = np.concatenate([mean, std, [brightness, contrast, texture]])
         return features.astype(np.float32)
 
-    def _extract_plantvillage_features(self, image: Image.Image) -> np.ndarray:
+    def _extract_image_features(self, image: Image.Image) -> np.ndarray:
         image_size = 32
         cell_size = 8
         cell_count = image_size // cell_size
@@ -378,10 +536,32 @@ class PlantDiseaseModel:
         source = Path(dataset_dir or self.image_dataset_path)
         if not source.is_dir():
             raise FileNotFoundError(
-                f"Disease image dataset not found: {source}. Download the labelled image dataset first."
+                f"Disease image dataset not found: {source}. Add labelled images in class folders first."
             )
 
         image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+        def validate_target_classes(class_counts):
+            expected = set(TARGET_DISEASES)
+            actual = set(class_counts)
+            if actual != expected:
+                missing = sorted(expected - actual)
+                unsupported = sorted(actual - expected)
+                details = []
+                if missing:
+                    details.append("missing classes: " + ", ".join(missing))
+                if unsupported:
+                    details.append("unsupported classes: " + ", ".join(unsupported))
+                raise ValueError("Target disease data must contain exactly the ten supported classes (" + "; ".join(details) + ").")
+            too_small = {
+                label: count for label, count in class_counts.items() if count < 30
+            }
+            if too_small:
+                details = ", ".join(f"{label}={count}" for label, count in sorted(too_small.items()))
+                raise ValueError(
+                    "At least 30 labelled images per target disease are required before training; "
+                    f"found {details}. This minimum does not guarantee 95% accuracy."
+                )
 
         def load_class_folders(folder: Path):
             features, labels, counts = [], [], {}
@@ -391,7 +571,7 @@ class PlantDiseaseModel:
                         continue
                     try:
                         with Image.open(image_path) as image:
-                            features.append(self._extract_plantvillage_features(image))
+                            features.append(self._extract_image_features(image))
                         labels.append(class_dir.name)
                         counts[class_dir.name] = counts.get(class_dir.name, 0) + 1
                     except (OSError, ValueError) as exc:
@@ -405,6 +585,11 @@ class PlantDiseaseModel:
         if train_dir.is_dir() and test_dir.is_dir():
             X_train, y_train, train_counts = load_class_folders(train_dir)
             X_test, y_test, test_counts = load_class_folders(test_dir)
+            if source.resolve() == self.image_dataset_path.resolve():
+                validate_target_classes({
+                    label: train_counts.get(label, 0) + test_counts.get(label, 0)
+                    for label in set(train_counts) | set(test_counts)
+                })
             if set(train_counts) != set(test_counts):
                 raise ValueError("Training and test folders must contain the same disease classes.")
             if min(train_counts.values()) < 2 or min(test_counts.values()) < 1:
@@ -416,6 +601,8 @@ class PlantDiseaseModel:
             split_strategy = "provided_train_test_split"
         else:
             X, y, class_counts = load_class_folders(source)
+            if source.resolve() == self.image_dataset_path.resolve():
+                validate_target_classes(class_counts)
             if len(X) < 30 or len(class_counts) < 2:
                 raise ValueError("Use at least 30 labelled images across at least two disease classes.")
             if min(class_counts.values()) < 2:
@@ -458,6 +645,40 @@ class PlantDiseaseModel:
         self.model = bundle
         return bundle
 
+    def train_from_reference_images(self, images: dict[str, Image.Image]):
+        """Store one labeled reference image per target class for similarity matching."""
+        expected = set(TARGET_DISEASES)
+        actual = set(images)
+        if actual != expected:
+            missing = sorted(expected - actual)
+            unsupported = sorted(actual - expected)
+            details = []
+            if missing:
+                details.append("missing classes: " + ", ".join(missing))
+            if unsupported:
+                details.append("unsupported classes: " + ", ".join(unsupported))
+            raise ValueError("Reference images must cover exactly the ten target diseases (" + "; ".join(details) + ").")
+
+        classes = sorted(TARGET_DISEASES)
+        features = np.vstack([
+            self._extract_image_features(images[label])
+            for label in classes
+        ])
+        bundle = {
+            "kind": "plant_disease_reference_v1",
+            "classes": classes,
+            "features": features,
+            "dataset_images": len(classes),
+            "class_counts": {label: 1 for label in classes},
+            "score_type": "cosine_visual_similarity",
+            "validation_accuracy": None,
+            "validation_images": 0,
+            "confidence_calibrated": False,
+        }
+        joblib.dump(bundle, self.reference_model_path)
+        self.model = bundle
+        return bundle
+
     def train(self):
         if self.image_dataset_path.is_dir():
             return self.train_from_directory(self.image_dataset_path)
@@ -485,6 +706,14 @@ class PlantDiseaseModel:
     def load_or_train(self):
         if self.model is not None:
             return self.model
+        if self.reference_model_path.is_file():
+            self.model = joblib.load(self.reference_model_path)
+            if (
+                isinstance(self.model, dict)
+                and self.model.get("kind") == "plant_disease_reference_v1"
+            ):
+                return self.model
+            raise ValueError(f"Invalid reference disease model artifact: {self.reference_model_path}")
         if self.image_dataset_path.is_dir():
             needs_training = not self.model_path.exists()
             if not needs_training:
