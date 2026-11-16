@@ -14,6 +14,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
+powershell -NoProfile -Command "$uri = 'http://127.0.0.1:8000/api/health'; try { $response = Invoke-WebRequest -Uri $uri -TimeoutSec 2; if ($response.StatusCode -eq 200) { Start-Process 'http://127.0.0.1:8000'; exit 0 } } catch { }; exit 1"
+if not errorlevel 1 exit /b 0
+
 start "Agriculture Threat Fusion" /min "%PYTHON%" -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
-powershell -NoProfile -Command "$uri = 'http://localhost:8000/api/health'; for ($i = 0; $i -lt 120; $i++) { try { $response = Invoke-WebRequest -Uri $uri -TimeoutSec 1; if ($response.StatusCode -eq 200) { Start-Process 'http://localhost:8000'; exit 0 } } catch { }; Start-Sleep -Seconds 1 }; Write-Error 'The app did not become ready. Check the Agriculture Threat Fusion server window for errors.'; exit 1"
+powershell -NoProfile -Command "$uri = 'http://127.0.0.1:8000/api/health'; for ($i = 0; $i -lt 120; $i++) { try { $response = Invoke-WebRequest -Uri $uri -TimeoutSec 1; if ($response.StatusCode -eq 200) { Start-Process 'http://127.0.0.1:8000'; exit 0 } } catch { }; Start-Sleep -Seconds 1 }; Write-Error 'The app did not become ready. Check the Agriculture Threat Fusion server window for errors.'; exit 1"
 if errorlevel 1 exit /b 1
