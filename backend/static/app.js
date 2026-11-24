@@ -8,7 +8,6 @@ const welcomeMessage = document.getElementById('welcomeMessage');
 const farmerProfileSummary = document.getElementById('farmerProfileSummary');
 const dashboardCards = document.getElementById('dashboardCards');
 const weatherForecast = document.getElementById('weatherForecast');
-const vegetationMap = document.getElementById('vegetationMap');
 const growthChart = document.getElementById('growthChart');
 const threatList = document.getElementById('threatList');
 const recommendationSummary = document.getElementById('recommendationSummary');
@@ -97,7 +96,6 @@ const renderDashboard = (dashboard, weather = null, water = null, threats = null
     { title: 'Soil type', value: farm.soilType || 'Not set', detail: 'Farmer supplied', tone: 'green' },
     { title: 'Weather', value: weather ? `${weather.current.temperatureC}°C · ${weather.current.condition}` : 'Unavailable', detail: weather ? `${weather.current.humidityPercent}% humidity · ${weather.current.rainfallMm} mm rain` : 'Live weather unavailable', tone: 'amber' },
     { title: 'Water requirement', value: water ? `${water.dailyIrrigationLitersEstimate} L/day est.` : 'Unavailable', detail: water ? `${water.nextSevenDaysLitersEstimate} L / 7-day estimate` : 'Needs crop, area, and live ET0', tone: 'teal' },
-    { title: 'Satellite / NDVI', value: integrations.satellite === 'configured' ? 'Sentinel Hub ready' : 'Needs credentials', detail: 'Sentinel-2 point sample', tone: 'blue' },
     { title: 'Market prices', value: integrations.marketPrices === 'configured' ? 'Agmarknet API ready' : 'Needs API key', detail: 'data.gov.in mandi arrivals', tone: 'purple' },
     { title: 'Weather threat alerts', value: threats ? `${threats.alerts.length} Active` : farm.latitude == null ? 'Set farm location' : 'Loading...', detail: threats ? `Updated ${threats.retrievedAt || 'just now'} · weather indicators` : 'Uses current weather and forecast', tone: 'red' }
   ];
@@ -109,7 +107,6 @@ const renderDashboard = (dashboard, weather = null, water = null, threats = null
     </div>
   `).join('');
 
-  vegetationMap.innerHTML = '<p class="empty-state">Satellite imagery and NDVI are not connected. No vegetation measurement is available.</p>';
   growthChart.innerHTML = '<p class="empty-state">Yield history will appear after real or farmer-recorded yield data is saved.</p>';
   renderThreatAlerts(threats, farm.latitude != null && farm.longitude != null);
   recommendationSummary.innerHTML = `
@@ -198,16 +195,6 @@ const loadMarketPrices = async () => {
   } catch (error) { output.textContent = error.message; }
 };
 
-const loadSatelliteNdvi = async () => {
-  const output = vegetationMap;
-  if (!output) return;
-  output.textContent = 'Requesting Sentinel-2 imagery sample...';
-  try {
-    const result = await api.get('/api/vegetation');
-    output.innerHTML = `<strong>NDVI:</strong> ${escapeHtml(result.ndvi)}<p>Source: ${escapeHtml(result.source)} · ${escapeHtml(result.retrievedAt)}</p><small>${escapeHtml(result.notice)}</small>`;
-  } catch (error) { output.textContent = error.message; }
-};
-
 const renderAdminStats = (adminData) => {
   const stats = [
     { label: 'Registered farmers', value: adminData.farmers },
@@ -293,8 +280,8 @@ const routeTitles = {
   farm: ['Farm records', 'Crop and Land Information'],
   recommendations: ['Decision support', 'Crop Recommendation'],
   disease: ['Image review', 'Disease Detection'],
+  chat: ['Farm advice', 'Farmer AI Assistant'],
   weather: ['Open-Meteo', 'Weather Monitoring'],
-  satellite: ['Provider unavailable', 'Satellite Vegetation'],
   yield: ['Historical district-level model', 'Crop Yield'],
   threats: ['Open-Meteo indicators', 'Weather Threat Alerts'],
   history: ['Your account records', 'Activity History'],
@@ -352,8 +339,8 @@ const renderCurrentPage = async () => {
   });
   document.querySelector('[data-feature-view~="settings"]').classList.toggle('hidden', page !== 'settings');
   document.getElementById('downloadReportButton').classList.toggle('hidden', page !== 'reports');
+  if (page === 'chat') document.querySelector('[data-feature-view~="chat"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   if (page === 'yield') { loadYieldEstimate(); loadMarketPrices(); }
-  if (page === 'satellite') loadSatelliteNdvi();
 };
 
 const logout = () => {
@@ -484,10 +471,14 @@ const analyzeDisease = async (event) => {
     if (!response.ok) {
       throw new Error(result.detail || 'Disease analysis failed.');
     }
+    if (result.result?.isPlantImage === false) {
+      diseaseResult.innerHTML = `<div class="diagnosis-summary"><strong>Not a plant photo</strong><p>${escapeHtml(result.result.message)}</p><p><strong>Confidence:</strong> 0%</p></div>`;
+      return;
+    }
 
     const {
       predictedDisease, diseaseName, detectedCrop, severity, symptoms, treatment, prevention,
-      warning, predictionStatus, cropName, cropStage, location, affectedCropParts = [],
+      warning, predictionStatus, cropName, cropStage, location, affectedCropParts = [], diseaseFertilizerGuidance,
       nutrientDeficienciesToCheck = [], fertilizerRecommendations = [], nutrientNotice,
       scoreType, similarityPct, causalAgent, fertilizerAdvice
     } = result.result;
@@ -567,10 +558,9 @@ const analyzeDisease = async (event) => {
         <p><strong>Parts to inspect:</strong> ${affectedCropParts.map(escapeHtml).join(', ') || 'Leaves and stems'}</p>
       </section>
       <section class="diagnosis-section">
-        <h3>Fertilizer names and nutrient deficiencies to check</h3>
-        <div class="nutrient-grid">${deficiencyMarkup}</div>
-        <p class="nutrient-notice">${escapeHtml(nutrientNotice || 'Confirm nutrient needs with a soil test before applying fertilizer.')}</p>
-        <p><strong>Fertilizer products to discuss with an agronomist:</strong> ${fertilizerRecommendations.map(escapeHtml).join(', ') || 'Based on soil test'}</p>
+        <h3>Fertilizer guidance for this disease</h3>
+        <p>${escapeHtml(diseaseFertilizerGuidance || fertilizerAdvice || 'Use soil-test-based balanced nutrition. Fertilizer does not cure plant disease.')}</p>
+        <p class="nutrient-notice">Confirm fertilizer needs with a soil test. Do not increase fertilizer rates to treat a disease.</p>
       </section>
       <section class="diagnosis-section">
         <h3>Disease treatment</h3>
@@ -778,9 +768,9 @@ const applyPlaceDetails = (place) => {
 document.getElementById('saveFarmButton').addEventListener('click', async () => {
   try {
     const result = await saveFarmProfile();
-    recommendationResult.textContent = `Saved farm profile for ${result.farm.farmName}.`;
+    mapStatus.textContent = `Farm details saved for ${result.farm.farmName}.`;
   } catch (error) {
-    recommendationResult.textContent = error.message || 'Unable to save farm profile.';
+    mapStatus.textContent = error.message || 'Unable to save farm profile.';
   }
 });
 
@@ -868,11 +858,43 @@ document.getElementById('loadThreatsButton').addEventListener('click', async () 
     button.disabled = false;
   }
 });
-document.getElementById('loadSatelliteButton').addEventListener('click', loadSatelliteNdvi);
+
+
+const farmerChatForm = document.getElementById('farmerChatForm');
+const farmerChatInput = document.getElementById('farmerChatInput');
+const farmerChatMessages = document.getElementById('farmerChatMessages');
+farmerChatForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const message = farmerChatInput.value.trim();
+  if (!message) return;
+  const userBubble = document.createElement('div');
+  userBubble.className = 'chat-bubble user';
+  userBubble.textContent = message;
+  farmerChatMessages.appendChild(userBubble);
+  farmerChatInput.value = '';
+  const pending = document.createElement('div');
+  pending.className = 'chat-bubble assistant pending';
+  pending.textContent = 'Thinking about your question...';
+  farmerChatMessages.appendChild(pending);
+  farmerChatMessages.scrollTop = farmerChatMessages.scrollHeight;
+  const sendButton = document.getElementById('farmerChatSend');
+  sendButton.disabled = true;
+  try {
+    const response = await api.post('/api/chat', { message });
+    pending.textContent = response.answer;
+    pending.classList.remove('pending');
+  } catch (error) {
+    pending.textContent = error.message || 'The assistant is unavailable. Please try again.';
+    pending.classList.remove('pending');
+    pending.classList.add('error');
+  } finally {
+    sendButton.disabled = false;
+    farmerChatMessages.scrollTop = farmerChatMessages.scrollHeight;
+  }
+});
 
 logoutButton.addEventListener('click', logout);
 diseaseForm.addEventListener('submit', analyzeDisease);
-cropRecommendationForm.addEventListener('submit', generateRecommendation);
 initializeFarmMap();
 window.addEventListener('popstate', renderCurrentPage);
 
