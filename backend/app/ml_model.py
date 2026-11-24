@@ -314,34 +314,6 @@ class PlantDiseaseModel:
         self._vision_processor = None
         self._vision_model = None
 
-    def is_plant_image(self, image: Image.Image) -> bool:
-        """Screen the uploaded image with Gemini before running disease analysis."""
-        import os
-        from google import genai
-        from google.genai import types
-        api_key = os.getenv("GEMINI_API_KEY", "").strip()
-        if not api_key:
-            raise RuntimeError("AI photo checking is not configured. Add GEMINI_API_KEY from Google AI Studio.")
-        buffer = BytesIO()
-        image.convert("RGB").save(buffer, format="JPEG", quality=82, optimize=True)
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
-            contents=[
-                "Is the main subject clearly a real plant, crop, leaf, stem, fruit, or other plant part? "
-                "Return JSON only with boolean key is_plant. People, animals, buildings, vehicles, documents, "
-                "screenshots, unrelated objects, and landscapes without a clear plant subject are false. "
-                "Yellow, brown, dry, diseased, or damaged leaves are still plants.",
-                types.Part.from_bytes(data=buffer.getvalue(), mime_type="image/jpeg"),
-            ],
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0),
-        )
-        try:
-            result = json.loads((response.text or "").strip())
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("The AI photo checker could not verify this image. Please try a clearer plant photo.") from exc
-        return isinstance(result, dict) and result.get("is_plant") is True
-
     def _analyze_with_gemini(self, image: Image.Image, crop_name: str | None = None):
         """Analyze a leaf photo using Gemini's free-tier vision API."""
         import os
@@ -357,12 +329,16 @@ class PlantDiseaseModel:
         buffer = BytesIO()
         image.convert("RGB").save(buffer, format="JPEG", quality=88, optimize=True)
         prompt = (
-            "You are a cautious crop-health assistant for farmers. Examine this leaf photo. "
-            "Do not claim certainty from one image. If it is not clearly a plant leaf or evidence is weak, "
-            "return disease_name='Unable to identify clearly' and confidence_level='low'. "
+            "You are a cautious crop-health assistant for farmers. First classify whether the main subject is clearly a real plant, crop, leaf, stem, fruit, or other plant part. "
+            "Return is_plant=false for people, animals, buildings, vehicles, documents, screenshots, unrelated objects, and landscapes without a clear plant subject. "
+            "Yellow, brown, dry, diseased, or damaged leaves are still plants. "
+            "If is_plant is false, set disease_name='Not a plant photo', confidence_level='low', severity='Not applicable', "
+            "symptoms='The image does not show a clear plant or crop.', treatment='Upload a clear photo of an affected plant part.', "
+            "prevention='Not applicable', affected_parts=[], alternatives=[], farmer_note='This is not a plant photo.' "
+            "and do not diagnose a disease. If it is a plant, do not claim certainty from one image. "
             "Distinguish visible disease signs from nutrient stress, pest damage, and physical injury. "
             "Do not prescribe pesticide brands or exact chemical doses. Recommend expert confirmation before spraying. "
-            "Return only JSON with these keys: disease_name, confidence_level (low/medium/high), "
+            "Return only JSON with these keys: is_plant (boolean), disease_name, confidence_level (low/medium/high), "
             "severity (Low/Moderate/High/Needs field inspection), symptoms, treatment, prevention, "
             "affected_parts (array), alternatives (array), farmer_note. "
             "Selected crop: " + ((crop_name or "").strip() or "not specified") + "."
@@ -437,6 +413,16 @@ class PlantDiseaseModel:
     def predict(self, image: Image.Image, crop_name: str | None = None):
         """Use Gemini vision for farmer-facing disease analysis."""
         analysis = self._analyze_with_gemini(image, crop_name)
+        if analysis.get("is_plant") is False:
+            return {
+                "isPlantImage": False,
+                "predictionStatus": "not_a_plant",
+                "confidencePct": 0,
+                "scorePct": 0,
+                "predictedDisease": "Not a plant photo",
+                "diseaseName": "Not a plant photo",
+                "message": "This image does not appear to show a plant or crop. Please upload a clear photo of an affected leaf, stem, fruit, or plant.",
+            }
         disease = str(analysis.get("disease_name") or "Unable to identify clearly").strip()
         confidence = str(analysis.get("confidence_level") or "low").lower()
         needs_review = confidence == "low" or disease.lower() in {
