@@ -10,7 +10,6 @@ const dashboardCards = document.getElementById('dashboardCards');
 const weatherForecast = document.getElementById('weatherForecast');
 const growthChart = document.getElementById('growthChart');
 const threatList = document.getElementById('threatList');
-const recommendationSummary = document.getElementById('recommendationSummary');
 const adminStats = document.getElementById('adminStats');
 const diseaseForm = document.getElementById('diseaseForm');
 const diseaseImageInput = document.getElementById('diseaseImage');
@@ -18,7 +17,6 @@ const diseaseCameraInput = document.getElementById('diseaseCameraInput');
 let selectedDiseaseFile = null;
 const diseaseResult = document.getElementById('diseaseResult');
 const cropRecommendationForm = document.getElementById('cropRecommendationForm');
-const recommendationResult = document.getElementById('recommendationResult');
 const activityHistory = document.getElementById('activityHistory');
 const farmMapElement = document.getElementById('farmMap');
 const mapStatus = document.getElementById('mapStatus');
@@ -576,51 +574,6 @@ const analyzeDisease = async (event) => {
   }
 };
 
-const generateRecommendation = async (event) => {
-  event.preventDefault();
-  const payload = farmerFormPayload();
-
-  recommendationResult.textContent = 'Generating the crop recommendation model output...';
-
-  try {
-    await api.put('/api/farm/profile', payload);
-    const response = await fetch('/api/farm/recommendation', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.detail || 'Recommendation failed.');
-    }
-
-    const { crop, requestedCrop, suitability, locationZone, reason, irrigationAdvice, fertilizerAdvice, risk, yieldExpectation } = result.recommendation;
-    recommendationResult.innerHTML = `
-      <strong>Crop entered:</strong> ${escapeHtml(requestedCrop)}<br>
-      <strong>Recommended crop:</strong> ${escapeHtml(crop)} (${escapeHtml(suitability)})<br>
-      <strong>Farm:</strong> ${escapeHtml(result.location.village)}, ${escapeHtml(result.location.district)}, ${escapeHtml(result.location.state)}<br>
-      <strong>Location zone:</strong> ${escapeHtml(locationZone)}<br>
-      <strong>Why this crop:</strong> ${escapeHtml(reason)}<br>
-      <strong>Irrigation:</strong> ${escapeHtml(irrigationAdvice)}<br>
-      <strong>Fertilizer:</strong> ${escapeHtml(fertilizerAdvice)}<br>
-      <strong>Risk:</strong> ${escapeHtml(risk)}<br>
-      <strong>Yield expectation:</strong> ${escapeHtml(yieldExpectation)}<br>
-    `;
-
-    recommendationSummary.innerHTML = `
-      <div><strong>Farmer:</strong> ${escapeHtml(result.farmer.name)}</div>
-      <div><strong>Farm:</strong> ${escapeHtml(result.location.village)}, ${escapeHtml(result.location.district)}, ${escapeHtml(result.location.state)}</div>
-      <div><strong>Crop entered:</strong> ${escapeHtml(requestedCrop)}</div>
-      <div><strong>Recommended crop:</strong> ${escapeHtml(crop)} (${escapeHtml(suitability)})</div>
-      <div><strong>Guidance:</strong> ${escapeHtml(irrigationAdvice)}</div>
-    `;
-    renderActivity((await api.get('/api/activity')).items);
-  } catch (error) {
-    recommendationResult.textContent = error.message || 'Unable to generate crop recommendation.';
-  }
-};
-
 const setFarmCoordinates = (latitude, longitude, source) => {
   latitudeInput.value = latitude.toFixed(6);
   longitudeInput.value = longitude.toFixed(6);
@@ -895,6 +848,7 @@ farmerChatForm.addEventListener('submit', async (event) => {
 
 logoutButton.addEventListener('click', logout);
 diseaseForm.addEventListener('submit', analyzeDisease);
+cropRecommendationForm.addEventListener('submit', (event) => event.preventDefault());
 initializeFarmMap();
 window.addEventListener('popstate', renderCurrentPage);
 
