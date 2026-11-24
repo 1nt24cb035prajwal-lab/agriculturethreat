@@ -44,7 +44,6 @@ DEMO_STATE = {
             {"title": "Crop Health", "value": "84%", "detail": "Stable vegetative growth", "tone": "blue"},
             {"title": "Disease Risk", "value": "Medium", "detail": "High humidity risk", "tone": "amber"},
             {"title": "Water Requirement", "value": "28 L/day", "detail": "Irrigation scheduled for evening", "tone": "teal"},
-            {"title": "Vegetation Health", "value": "NDVI 0.72", "detail": "Healthy canopy cover", "tone": "green"},
             {"title": "Expected Yield", "value": "6.2 t/acre", "detail": "Projected harvest in 18 days", "tone": "purple"},
             {"title": "Fertilizer", "value": "NPK Balanced", "detail": "Apply top dressing in 3 days", "tone": "orange"},
             {"title": "Threat Alerts", "value": "3 Active", "detail": "2 medium, 1 high", "tone": "red"}
@@ -143,7 +142,6 @@ DEMO_STATE = {
         "cropHealth": "Stable crop growth with slight disease stress.",
         "diseasePrediction": "Moderate risk of leaf blast confirmed by field and weather data.",
         "weatherAnalysis": "Warm and humid conditions continue for 3 days.",
-        "satelliteReport": "NDVI remains above healthy threshold overall.",
         "waterReport": "Water requirement is within expected range for this crop stage.",
         "fertilizerReport": "Balanced NPK, top-dressing recommended after rainfall.",
         "yieldReport": "Projected yield remains strong with manageable seasonal risk.",
