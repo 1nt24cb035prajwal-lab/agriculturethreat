@@ -77,9 +77,11 @@ def test_farmer_private_endpoints_require_login():
 
 def test_auth_and_farmer_pages_have_separate_direct_urls():
     client = TestClient(app)
-    for path in ("/login", "/register", "/dashboard", "/farm", "/recommendations", "/disease", "/weather", "/satellite", "/yield", "/threats", "/history", "/reports", "/settings"):
+    for path in ("/login", "/register", "/dashboard", "/farm", "/recommendations", "/disease", "/weather", "/yield", "/threats", "/history", "/reports", "/settings"):
         response = client.get(path)
         assert response.status_code == 200, (path, response.text)
+    assert client.get("/satellite").status_code == 404
+    assert client.get("/api/vegetation").status_code == 404
 
 
 def test_dashboard_is_farmer_scoped_and_unconfigured_feeds_are_not_fabricated():
