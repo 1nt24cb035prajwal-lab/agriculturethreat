@@ -48,7 +48,7 @@ def test_disease_model_trains_from_class_labelled_image_folders(tmp_path: Path):
     assert "accuracy" not in prediction["warning"]
 
 
-def test_reference_archive_builds_similarity_model_without_claiming_confidence(tmp_path: Path):
+def test_reference_archive_does_not_override_gemini_disease_analysis(tmp_path: Path):
     archive_path = tmp_path / "references.zip"
     with zipfile.ZipFile(archive_path, "w") as archive:
         for index, (filename, label) in enumerate(REFERENCE_IMAGE_LABELS.items()):
@@ -63,14 +63,24 @@ def test_reference_archive_builds_similarity_model_without_claiming_confidence(t
     reference_images = load_reference_images(archive_path)
     engine = PlantDiseaseModel(tmp_path)
     bundle = engine.train_from_reference_images(reference_images)
-    prediction = engine.predict(reference_images["Maize___Banded_Leaf_and_Sheath_Blight"])
+    engine._analyze_with_gemini = lambda image, crop_name=None: {
+        "is_plant": True,
+        "disease_name": "Banded Leaf and Sheath Blight",
+        "confidence_level": "high",
+        "severity": "Moderate",
+        "symptoms": "Leaf and sheath lesions.",
+        "treatment": "Seek local crop protection advice.",
+        "prevention": "Use healthy planting material.",
+        "affected_parts": ["Leaves", "Sheath"],
+        "alternatives": ["Leaf spot"],
+        "farmer_note": "Confirm in the field.",
+    }
+    prediction = engine.predict(reference_images["Maize___Banded_Leaf_and_Sheath_Blight"], crop_name="Maize")
 
     assert bundle["kind"] == "plant_disease_reference_v1"
     assert bundle["dataset_images"] == 10
     assert prediction["predictedDisease"] == "Maize — Banded Leaf and Sheath Blight"
     assert prediction["detectedCrop"] == "Maize"
-    assert prediction["scoreType"] == "reference_similarity"
-    assert prediction["similarityPct"] == 100
+    assert prediction["modelName"] == "Gemini Vision"
     assert prediction["confidencePct"] is None
-    assert "not diagnostic confidence" in prediction["confidenceStatus"]
-    assert "not diagnostic confidence or measured accuracy" in prediction["warning"]
+    assert prediction["topPredictions"][0]["disease"] == "Leaf spot"

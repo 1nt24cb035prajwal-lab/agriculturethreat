@@ -19,7 +19,6 @@ def configured_status() -> dict[str, str]:
     return {
         "googleOAuth": "configured" if os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET") else "needs_credentials",
         "smsOtp": "disabled",
-        "sentinelHub": "configured" if os.getenv("SENTINELHUB_CLIENT_ID") and os.getenv("SENTINELHUB_CLIENT_SECRET") else "needs_credentials",
         "marketPrices": "configured" if os.getenv("DATA_GOV_IN_API_KEY") else "needs_api_key",
     }
 
@@ -82,54 +81,6 @@ async def exchange_google_code(code: str, redirect_uri: str) -> dict[str, Any]:
     if not profile.get("email") or not profile.get("email_verified"):
         raise ProviderUnavailable("Google did not return a verified email address.")
     return profile
-
-
-async def fetch_sentinel_ndvi(latitude: float, longitude: float) -> dict[str, Any]:
-    client_id, client_secret = os.getenv("SENTINELHUB_CLIENT_ID"), os.getenv("SENTINELHUB_CLIENT_SECRET")
-    if not client_id or not client_secret:
-        raise ProviderUnavailable("Satellite NDVI is not configured. Add Sentinel Hub client credentials.")
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            auth = await client.post(
-                "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/token",
-                data={"grant_type": "client_credentials", "client_id": client_id, "client_secret": client_secret},
-            )
-            auth.raise_for_status()
-            access_token = auth.json()["access_token"]
-            delta = 0.00012
-            body = {
-                "input": {
-                    "bounds": {"bbox": [longitude-delta, latitude-delta, longitude+delta, latitude+delta], "properties": {"crs": "http://www.opengis.net/def/crs/EPSG/0/4326"}},
-                    "data": [{"type": "sentinel-2-l2a", "dataFilter": {"timeRange": {"from": (date.today()-timedelta(days=45)).isoformat()+"T00:00:00Z", "to": date.today().isoformat()+"T23:59:59Z"}, "maxCloudCoverage": 35}}],
-                },
-                "evalscript": "//VERSION=3\nfunction setup(){return {input:[{bands:[\"B04\",\"B08\",\"dataMask\"]}],output:{bands:2,sampleType:\"FLOAT32\"}}}\nfunction evaluatePixel(s){if(s.dataMask===0)return [-9999,0];let d=(s.B08+s.B04)===0?0:(s.B08-s.B04)/(s.B08+s.B04);return [d,1]}",
-                "output": {"width": 1, "height": 1, "responses": [{"identifier": "default", "format": {"type": "application/json"}}]},
-            }
-            response = await client.post("https://services.sentinel-hub.com/api/v1/process", json=body, headers={"Authorization": f"Bearer {access_token}"})
-            response.raise_for_status()
-            payload = response.json()
-    except (httpx.HTTPError, KeyError, ValueError) as exc:
-        raise ProviderUnavailable("Sentinel Hub did not return a usable NDVI sample. Check subscription, quota, and imagery availability.") from exc
-    # JSON output may expose band statistics or direct sample arrays depending on the Sentinel Hub response.
-    data_items = payload.get("data") or []
-    ndvi = None
-    if isinstance(data_items, list) and data_items:
-        bands = data_items[0].get("bands", {}) if isinstance(data_items[0], dict) else {}
-        band_zero = bands.get("B0", {}) if isinstance(bands, dict) else {}
-        stats = band_zero.get("stats", {}) if isinstance(band_zero, dict) else {}
-        if isinstance(stats.get("mean"), (int, float)):
-            ndvi = float(stats["mean"])
-        elif isinstance(band_zero.get("sample"), (int, float)):
-            ndvi = float(band_zero["sample"])
-    if ndvi is None:
-        values = payload.get("default") or payload.get("data") or []
-        if isinstance(values, list) and values and isinstance(values[0], (int, float)):
-            ndvi = float(values[0])
-        elif isinstance(payload.get("data"), dict):
-            ndvi = payload["data"].get("ndvi")
-    if ndvi is None or not -1 <= float(ndvi) <= 1:
-        raise ProviderUnavailable("Sentinel Hub returned no valid NDVI sample for this farm point (possibly cloud or no-data pixels).")
-    return {"ndvi": round(float(ndvi), 3), "source": "Sentinel Hub Sentinel-2 L2A", "retrievedAt": date.today().isoformat(), "windowDays": 45, "cloudCoverageMaxPercent": 35, "coordinates": {"latitude": latitude, "longitude": longitude}, "notice": "Single farm-point sample; cloud filtering and a 45-day search window apply. Not a whole-field average."}
 
 
 async def fetch_market_prices(state: str, district: str, commodity: str, limit: int = 10) -> dict[str, Any]:

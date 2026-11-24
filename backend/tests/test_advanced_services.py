@@ -36,7 +36,6 @@ def test_provider_status_reports_missing_credentials_without_claiming_live_data(
     status = configured_status()
     assert status["googleOAuth"] in {"configured", "needs_credentials"}
     assert status["smsOtp"] == "disabled"
-    assert status["sentinelHub"] in {"configured", "needs_credentials"}
     assert status["marketPrices"] in {"configured", "needs_api_key"}
 
 

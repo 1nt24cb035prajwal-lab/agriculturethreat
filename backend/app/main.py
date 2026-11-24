@@ -340,7 +340,6 @@ async def get_dashboard(farmer: dict = Depends(require_farmer)):
         "farm": farm,
         "integrations": {
             "weather": "configured",
-            "satellite": advanced_services.configured_status()["sentinelHub"],
             "marketPrices": advanced_services.configured_status()["marketPrices"],
             "nearbyMarkets": advanced_services.configured_status()["marketPrices"],
             "smsAlerts": advanced_services.configured_status()["smsOtp"],
@@ -403,19 +402,6 @@ async def search_farm_location(q: str, farmer: dict = Depends(require_farmer)):
     except integrations.ProviderUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"results": results, "source": "OpenStreetMap Nominatim"}
-
-
-@app.get("/api/vegetation")
-async def get_vegetation(farmer: dict = Depends(require_farmer)):
-    farm = database.get_farm(farmer["id"])
-    if farm.get("latitude") is None or farm.get("longitude") is None:
-        raise HTTPException(status_code=400, detail="Save farm coordinates before requesting satellite NDVI.")
-    try:
-        result = await advanced_services.fetch_sentinel_ndvi(float(farm["latitude"]), float(farm["longitude"]))
-    except advanced_services.ProviderUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    database.record_activity(farmer["id"], "satellite_ndvi", {"ndvi": result["ndvi"], "source": result["source"]})
-    return result
 
 
 @app.get("/api/disease")
@@ -593,8 +579,25 @@ async def analyze_disease(
         farm = database.get_farm(farmer["id"])
         selected_crop = (cropName or farm.get("cropName") or "").strip()
         result = MODEL_ENGINE.predict(image, crop_name=selected_crop or None)
+        if result.get("isPlantImage") is False:
+            return {
+                "message": "This is not a plant photo.",
+                "result": result,
+                "demoMode": False,
+            }
         result["cropName"] = selected_crop or "Not provided"
         result.update(MODEL_ENGINE.nutrient_guidance(result["cropName"]))
+        disease_key = str(result.get("diseaseName") or result.get("predictedDisease") or "").lower()
+        if any(term in disease_key for term in ("blight", "leaf spot", "mildew", "rust", "anthracnose")):
+            fertilizer_advice = "For fungal leaf spots or blight, fertilizer is not a cure. Avoid excess nitrogen; maintain balanced potassium only as indicated by a soil test and keep foliage dry."
+        elif any(term in disease_key for term in ("bacterial", "bacterial spot")):
+            fertilizer_advice = "For bacterial disease symptoms, fertilizer cannot cure infection. Avoid excess nitrogen and maintain balanced potassium based on a soil test."
+        elif any(term in disease_key for term in ("mosaic", "viral", "virus")):
+            fertilizer_advice = "No fertilizer cures a plant virus. Maintain balanced nutrition only as indicated by a soil test; seek local advice on managing infected plants."
+        else:
+            fertilizer_advice = "No disease-specific fertilizer cure is established from this image. Use soil-test-based balanced nutrition; fertilizer does not treat fungal, bacterial, or viral infection."
+        result["fertilizerAdvice"] = fertilizer_advice
+        result["diseaseFertilizerGuidance"] = fertilizer_advice
         result["cropStage"] = cropStage or farm.get("cropStage") or "Not provided"
         result["location"] = {
             "state": state or farm.get("state") or "",
@@ -651,35 +654,64 @@ async def get_disease_history_image(image_id: str, farmer: dict = Depends(requir
     )
 
 
+@app.post("/api/chat")
+async def farmer_ai_chat(payload: dict, farmer: dict = Depends(require_farmer)):
+    message = str(payload.get("message") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Please enter your farming question.")
+    if len(message) > 4000:
+        raise HTTPException(status_code=400, detail="Please keep your question under 4,000 characters.")
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Farmer AI chat needs GEMINI_API_KEY in the server environment.")
+    try:
+        from google import genai
+        from google.genai import types
+        farm = database.get_farm(farmer["id"])
+        farm_context = (
+            f"Saved crop: {farm.get('cropName') or 'not provided'}; soil: {farm.get('soilType') or 'not provided'}; "
+            f"season: {farm.get('season') or 'not provided'}; district: {farm.get('district') or 'not provided'}, "
+            f"state: {farm.get('state') or 'not provided'}."
+        )
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
+            contents=[
+                "You are a practical agricultural extension assistant for farmers in India. Use simple language. "
+                "Help with crops, soil, irrigation, pests, diseases, fertilizer, sowing, and harvest. Ask for missing details. "
+                "Never invent pesticide registrations, chemical doses, or guaranteed yields. Never recommend mixing chemicals. "
+                "For chemical use, tell the farmer to follow the product label and local agriculture department advice. "
+                "For serious outbreaks, recommend a KVK or local agriculture officer. Keep answers concise. "
+                + farm_context + "\nFarmer question: " + message
+            ],
+            config=types.GenerateContentConfig(temperature=0.35, max_output_tokens=700),
+        )
+        answer = (response.text or "").strip()
+        if not answer:
+            raise RuntimeError("The assistant returned an empty answer.")
+        database.record_activity(farmer["id"], "farmer_ai_chat", {"question": message[:500]})
+        return {"answer": answer, "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="The farming assistant is temporarily unavailable. Please try again shortly.") from exc
+
+
 @app.get("/api/disease/status")
 async def disease_status():
-    if MODEL_ENGINE.reference_model_path.is_file():
-        model = MODEL_ENGINE.load_or_train()
-        if isinstance(model, dict) and model.get("kind") == "plant_disease_reference_v1":
-            return {
-                "status": "ready",
-                "classes": model["classes"],
-                "provider": "Local ten-image reference matcher",
-                "apiKeyRequired": False,
-                "datasetImages": model["dataset_images"],
-                "classCounts": model["class_counts"],
-                "scoreType": model["score_type"],
-                "validationAccuracy": None,
-                "confidenceCalibrated": False,
-                "notice": (
-                    "One reference image per disease; outputs are visual similarity only, "
-                    "not diagnostic confidence or measured accuracy."
-                ),
-            }
-    import os
-    return {"status": "ready" if os.getenv("GEMINI_API_KEY", "").strip() else "setup_required", "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"), "provider": "Google Gemini Vision", "apiKeyRequired": True}
+    configured = bool(os.getenv("GEMINI_API_KEY", "").strip())
+    return {
+        "status": "ready" if configured else "setup_required",
+        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
+        "provider": "Google Gemini Vision",
+        "apiKeyRequired": True,
+        "notice": "AI image screening and disease guidance use Gemini Vision. Free-tier quotas and availability are controlled by Google.",
+    }
 
 
 @app.get("/{page_name}", response_class=HTMLResponse)
 async def application_page(page_name: str, request: Request):
     pages = {
         "login", "register", "dashboard", "farm", "recommendations", "disease",
-        "weather", "satellite", "yield", "threats", "history", "reports", "settings",
+        "weather", "yield", "threats", "history", "reports", "settings",
     }
     if page_name not in pages:
         raise HTTPException(status_code=404, detail="Page not found.")
