@@ -378,25 +378,24 @@ body[data-page="farm"] [data-feature-view],
 body[data-page="recommendations"] [data-feature-view],
 body[data-page="disease"] [data-feature-view],
 body[data-page="weather"] [data-feature-view],
-body[data-page="satellite"] [data-feature-view],
 body[data-page="yield"] [data-feature-view],
 body[data-page="threats"] [data-feature-view],
 body[data-page="history"] [data-feature-view],
 body[data-page="reports"] [data-feature-view],
-body[data-page="settings"] [data-feature-view] {
+body[data-page="settings"] [data-feature-view],
+body[data-page="chat"] [data-feature-view] {
   display: none;
 }
 
 body[data-page="dashboard"] [data-feature-view~="dashboard"],
+body[data-page="chat"] [data-feature-view~="chat"],
 body[data-page="dashboard"] [data-feature-view~="weather"],
-body[data-page="dashboard"] [data-feature-view~="satellite"],
 body[data-page="dashboard"] [data-feature-view~="yield"],
 body[data-page="dashboard"] [data-feature-view~="threats"],
 body[data-page="farm"] [data-feature-view~="farm"],
 body[data-page="recommendations"] [data-feature-view~="recommendations"],
 body[data-page="disease"] [data-feature-view~="disease"],
 body[data-page="weather"] [data-feature-view~="weather"],
-body[data-page="satellite"] [data-feature-view~="satellite"],
 body[data-page="yield"] [data-feature-view~="yield"],
 body[data-page="threats"] [data-feature-view~="threats"],
 body[data-page="history"] [data-feature-view~="history"],
@@ -415,7 +414,6 @@ body:not([data-page="dashboard"]) .dashboard-grid {
 
 body[data-page="dashboard"] .two-col-layout,
 body[data-page="weather"] .two-col-layout,
-body[data-page="satellite"] .two-col-layout,
 body[data-page="yield"] .two-col-layout,
 body[data-page="threats"] .two-col-layout {
   display: grid;
@@ -1206,3 +1204,18 @@ button:focus-visible,a:focus-visible {outline:3px solid rgba(92,125,84,.35);outl
  .farmer-navigation {margin:14px 0;}
  .two-col,.two-col-layout,.about-grid,.feature-grid,.workflow-grid,.dashboard-grid,.admin-grid {grid-template-columns:1fr;}
 }
+
+
+/* Farmer AI chat panel */
+.welcome-dashboard-copy { color: #536e60; line-height: 1.65; margin: 0 0 12px; }
+.farmer-chat-messages { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; padding: 14px; margin: 14px 0; border-radius: 16px; background: #f2f8f3; }
+.chat-bubble { max-width: 88%; white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px 15px; border-radius: 15px; line-height: 1.55; }
+.chat-bubble.assistant { align-self: flex-start; background: #fff; color: #254735; border: 1px solid #dce9df; }
+.chat-bubble.user { align-self: flex-end; background: #24613d; color: #fff; }
+.chat-bubble.pending { opacity: .72; }
+.chat-bubble.error { border-color: #e7b8ae; color: #8d3325; }
+.farmer-chat-form { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; }
+.farmer-chat-form textarea { width: 100%; min-height: 54px; resize: vertical; border: 1px solid #cfddd2; border-radius: 12px; padding: 12px; font: inherit; }
+.chat-intro { color: #536e60; line-height: 1.6; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 640px) { .farmer-chat-form { grid-template-columns: 1fr; } .chat-bubble { max-width: 96%; } }
