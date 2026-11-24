@@ -1,10 +1,11 @@
 from io import BytesIO
 from uuid import uuid4
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from backend.app.main import app
+from backend.app.main import app, MODEL_ENGINE
 
 
 client = TestClient(app)
@@ -74,20 +75,32 @@ def test_disease_analysis_accepts_crop_and_location_metadata():
     buffer = BytesIO()
     Image.new("RGB", (32, 32), color=(120, 150, 80)).save(buffer, format="PNG")
     image_bytes = buffer.getvalue()
-    response = client.post(
-        "/api/disease/analyze",
-        files={"file": ("leaf.png", image_bytes, "image/png")},
-        data={
-            "cropName": "Tomato",
-            "cropStage": "Flowering",
-            "state": "Tamil Nadu",
-            "district": "Coimbatore",
-            "village": "Hunsur",
-            "latitude": "11.0",
-            "longitude": "77.0",
-        },
-    )
-    assert response.status_code == 200, response.text
+    with patch.object(MODEL_ENGINE, "_analyze_with_gemini", return_value={
+        "is_plant": True,
+        "disease_name": "Early blight",
+        "confidence_level": "medium",
+        "severity": "Moderate",
+        "symptoms": "Dark spots are visible.",
+        "treatment": "Remove affected leaves and seek local advice.",
+        "prevention": "Avoid prolonged leaf wetness.",
+        "affected_parts": ["Leaves"],
+        "alternatives": ["Nutrient stress"],
+        "farmer_note": "Confirm before treatment.",
+    }):
+        response = client.post(
+                "/api/disease/analyze",
+            files={"file": ("leaf.png", image_bytes, "image/png")},
+            data={
+                "cropName": "Tomato",
+                "cropStage": "Flowering",
+                "state": "Tamil Nadu",
+                "district": "Coimbatore",
+                "village": "Hunsur",
+                "latitude": "11.0",
+                "longitude": "77.0",
+            },
+        )
+        assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["result"]["predictedDisease"]
     assert payload["result"]["diseaseName"]
