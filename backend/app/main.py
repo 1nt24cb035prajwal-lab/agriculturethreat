@@ -576,23 +576,15 @@ async def analyze_disease(
         if source_image.width * source_image.height > 20_000_000:
             raise HTTPException(status_code=400, detail="Crop image dimensions are too large to analyze.")
         image = source_image.convert("RGB")
-        if not MODEL_ENGINE.is_plant_image(image):
-            return {
-                "message": "This is not a plant photo.",
-                "result": {
-                    "isPlantImage": False,
-                    "predictionStatus": "not_a_plant",
-                    "confidencePct": 0,
-                    "scorePct": 0,
-                    "predictedDisease": "Not a plant photo",
-                    "diseaseName": "Not a plant photo",
-                    "message": "This image does not appear to show a plant or crop. Please upload a clear photo of an affected leaf, stem, fruit, or plant.",
-                },
-                "demoMode": False,
-            }
         farm = database.get_farm(farmer["id"])
         selected_crop = (cropName or farm.get("cropName") or "").strip()
         result = MODEL_ENGINE.predict(image, crop_name=selected_crop or None)
+        if result.get("isPlantImage") is False:
+            return {
+                "message": "This is not a plant photo.",
+                "result": result,
+                "demoMode": False,
+            }
         result["cropName"] = selected_crop or "Not provided"
         result.update(MODEL_ENGINE.nutrient_guidance(result["cropName"]))
         disease_key = str(result.get("diseaseName") or result.get("predictedDisease") or "").lower()
