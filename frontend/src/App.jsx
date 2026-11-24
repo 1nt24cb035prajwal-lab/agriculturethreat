@@ -4,7 +4,6 @@ export default function App() {
     { title: 'Crop Health', value: '84%', detail: 'Strong vegetative stage', tone: 'blue' },
     { title: 'Disease Risk', value: 'Medium', detail: 'Leaf blast watch', tone: 'amber' },
     { title: 'Water Requirement', value: '28 L/day', detail: 'Schedule irrigation', tone: 'teal' },
-    { title: 'NDVI', value: '0.72', detail: 'Healthy canopy', tone: 'green' },
     { title: 'Expected Yield', value: '6.2 t/acre', detail: '36 days to harvest', tone: 'purple' },
     { title: 'Fertilizer', value: 'Urea + Potash', detail: 'Top dress in 3 days', tone: 'orange' },
     { title: 'Threat Alerts', value: '3 Active', detail: '2 medium, 1 high', tone: 'red' }
@@ -18,7 +17,6 @@ export default function App() {
           <button>Dashboard</button>
           <button>Crop Input</button>
           <button>Weather</button>
-          <button>Satellite</button>
           <button>Disease AI</button>
           <button>Water & Soil</button>
           <button>Reports</button>
