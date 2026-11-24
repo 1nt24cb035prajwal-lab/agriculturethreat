@@ -90,7 +90,7 @@
           <div class="feature-grid">
             <article class="feature-card"><span>🩺</span><h3>Specific Crop Disease Detection</h3><p>Upload a leaf photo to check for possible crop diseases and receive symptoms, treatment, and prevention guidance.</p></article>
             <article class="feature-card"><span>⛅</span><h3>Weather Monitoring</h3><p>Current conditions and a seven-day forecast use Open-Meteo for the saved farm coordinates.</p></article>
-            <article class="feature-card"><span>🛰️</span><h3>Satellite Vegetation</h3><p>Monitor vegetation conditions for your farm when satellite information is available.</p></article>
+            <article class="feature-card"><span>🤖</span><h3>Farmer AI Assistant</h3><p>Ask practical questions about crops, soil, irrigation, pests, disease, and farm management.</p></article>
             <article class="feature-card"><span>💧</span><h3>Water Planning</h3><p>Get irrigation guidance using your crop, soil, and farm information.</p></article>
             <article class="feature-card"><span>🌱</span><h3>Soil and Crop Records</h3><p>Store crop, season, irrigation, water source, and optional soil test measurements per farmer.</p></article>
             <article class="feature-card"><span>📈</span><h3>Crop Yield Prediction</h3><p>View an estimated harvest based on your crop and farm details.</p></article>
@@ -156,17 +156,15 @@
           <nav class="farmer-navigation" aria-label="Farmer pages">
             <a href="/dashboard" data-route-link>Dashboard</a>
             <a href="/farm" data-route-link>Crop and Land</a>
-            <a href="/recommendations" data-route-link>Crop Recommendation</a>
             <a href="/disease" data-route-link>Disease Detection</a>
             <a href="/weather" data-route-link>Weather</a>
-            <a href="/satellite" data-route-link>Satellite</a>
             <a href="/yield" data-route-link>Yield</a>
             <a href="/threats" data-route-link>Threats</a>
             <a href="/history" data-route-link>Activity</a>
             <a href="/reports" data-route-link>Reports</a>
             <a href="/settings" data-route-link>Settings</a>
           </nav>
-          <div class="data-notice" role="status">Farm records are private to your account. Weather-based alerts use Open-Meteo. API-backed mandi prices need a data.gov.in key; you can also open the official Agmarknet portal directly.</div>
+          <div class="data-notice" role="status">Your farm records are private to your account. Get practical crop, weather, irrigation, and disease guidance in one place.</div>
           <div class="dashboard-header">
             <div>
               <p class="eyebrow" id="pageEyebrow">Farmer dashboard</p>
@@ -185,16 +183,11 @@
               <p class="weather-source-note">Temperature, rain probability, expected rainfall, and reference evapotranspiration for your saved farm coordinates.</p>
               <div id="weatherForecast" class="forecast-list"></div>
             </div>
-            <div class="panel" data-feature-view="satellite">
-              <div class="panel-title">Vegetation Status</div>
-              <div id="vegetationMap" class="vegetation-map"></div>
-              <button class="secondary-btn" id="loadSatelliteButton" type="button">Fetch Sentinel-2 NDVI</button>
-            </div>
           </div>
 
           <div class="panel wide-panel" data-feature-view="yield">
             <div class="panel-title">Nearby mandi prices</div>
-            <div class="two-col"><label>Commodity<input id="marketCommodity" type="text" placeholder="Use saved crop or enter commodity" /></label><div class="location-actions"><button class="secondary-btn" id="loadMarketsButton" type="button">Fetch live mandi prices</button><a class="secondary-btn" href="https://visualize.data.gov.in/?inst=9ef84268-d588-465a-a308-a864a43d0070" target="_blank" rel="noopener noreferrer">Open live Agmarknet price dashboard</a></div></div>
+            <div class="two-col"><label>Commodity<input id="marketCommodity" type="text" placeholder="Use saved crop or enter commodity" /></label><div class="location-actions"><button class="secondary-btn" id="loadMarketsButton" type="button">Fetch live mandi prices</button></div></div>
             <div id="marketResult" class="list-stack"></div>
           </div>
 
@@ -212,8 +205,20 @@
             </div>
           </div>
 
+          <div class="panel wide-panel" data-feature-view="dashboard chat">
+            <div class="panel-title">Ask the Farmer AI Assistant</div>
+            <p class="chat-intro">Ask about your crop, soil, irrigation, pests, diseases, fertilizers, or harvest. For important treatment decisions, confirm advice with your local agriculture officer.</p>
+            <div id="farmerChatMessages" class="farmer-chat-messages" aria-live="polite"><div class="chat-bubble assistant">Namaste! Tell me what is happening on your farm, and I will help you plan the next steps.</div></div>
+            <form id="farmerChatForm" class="farmer-chat-form">
+              <label class="sr-only" for="farmerChatInput">Your farming question</label>
+              <textarea id="farmerChatInput" rows="2" maxlength="4000" placeholder="Example: My tomato leaves are turning yellow. What should I check?" required></textarea>
+              <button class="primary-btn" id="farmerChatSend" type="submit">Ask Assistant</button>
+            </form>
+          </div>
+
           <div class="panel wide-panel" data-feature-view="dashboard">
-            <div class="panel-title">Farm Recommendations</div>
+            <div class="panel-title">Your Farm at a Glance</div>
+            <p class="welcome-dashboard-copy">Keep your farm details updated to receive useful weather, water, yield, and crop-health guidance.</p>
             <div id="recommendationSummary" class="recommendation-box"></div>
           </div>
 
@@ -291,9 +296,7 @@
               <div id="farmMap" aria-label="Farm location map"></div>
               <p id="mapStatus" class="map-status">No farm location saved. Click the map, move the pin, or allow device location to set coordinates.</p>
               <button class="secondary-btn" id="saveFarmButton" type="button">Save Farm Details</button>
-              <button class="primary-btn" type="submit">Generate Recommendation</button>
             </form>
-            <div id="recommendationResult" class="disease-result">Add your farm location and crop to generate a location-aware recommendation.</div>
           </div>
 
           <div class="panel wide-panel" data-feature-view="disease">
