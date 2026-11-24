@@ -340,7 +340,6 @@ async def get_dashboard(farmer: dict = Depends(require_farmer)):
         "farm": farm,
         "integrations": {
             "weather": "configured",
-            "satellite": advanced_services.configured_status()["sentinelHub"],
             "marketPrices": advanced_services.configured_status()["marketPrices"],
             "nearbyMarkets": advanced_services.configured_status()["marketPrices"],
             "smsAlerts": advanced_services.configured_status()["smsOtp"],
