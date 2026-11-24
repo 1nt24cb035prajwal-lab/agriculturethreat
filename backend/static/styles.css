@@ -1219,3 +1219,22 @@ button:focus-visible,a:focus-visible {outline:3px solid rgba(92,125,84,.35);outl
 .chat-intro { color: #536e60; line-height: 1.6; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 640px) { .farmer-chat-form { grid-template-columns: 1fr; } .chat-bubble { max-width: 96%; } }
+
+/* Refined farmer dashboard welcome area */
+.dashboard-header {
+  padding: 24px 26px;
+  border-radius: 20px;
+  background: linear-gradient(125deg, #153f2d 0%, #276b43 58%, #4b9361 100%);
+  color: #f7fff8;
+  box-shadow: 0 14px 28px rgba(21, 63, 45, .14);
+}
+.dashboard-header .eyebrow,
+.dashboard-header h2,
+.dashboard-header .page-title,
+.dashboard-header .profile-summary { color: #f7fff8; }
+.dashboard-header h2 { font-size: clamp(1.45rem, 2.5vw, 2rem); margin: 5px 0; }
+.dashboard-header .page-title { opacity: .88; }
+.dashboard-header .secondary-btn { background: #fff; color: #205438; border-color: rgba(255,255,255,.6); }
+.dashboard-guidance { color: #526c5d; line-height: 1.7; margin: 0; }
+.farmer-navigation { box-shadow: 0 5px 16px rgba(21, 63, 45, .05); }
+@media (max-width: 640px) { .dashboard-header { padding: 20px; } }
