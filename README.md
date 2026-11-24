@@ -79,13 +79,7 @@ Train the crop recommendation and yield models:
 
 The crop trainer validates the eight required columns, requires at least 30 labelled rows and two crop classes, performs a stratified 80/20 hold-out split, reports validation accuracy, and writes `backend/models/crop_recommendation_model.joblib`. The yield trainer holds out the latest years, reports MAE, RMSE, R², and a within-25%-of-observed rate, and writes `backend/models/yield_prediction_model.joblib`. The app loads trained models when available. The crop and yield model files are generated locally.
 
-To build the ten-photo disease reference prototype, pass the supplied ZIP to the trainer:
-
-```powershell
-.\\.venv\\Scripts\\python.exe backend\\scripts\\train_disease_model.py "C:\\path\\to\\dataset_@1.zip"
-```
-
-This writes `backend/models/plant_disease_reference_model.joblib`. The app matches uploads to the closest of one reference image per disease and reports visual similarity—not diagnostic confidence or measured accuracy.
+The current farmer-facing disease workflow uses Gemini Vision rather than the earlier ten-image similarity prototype. The old training artifact, if present, is not used for live disease predictions.
 
 Dataset archives and generated crop and yield model files are excluded from Git to avoid committing large data or build artifacts. The downloader no longer downloads PlantVillage; existing local PlantVillage files are left untouched and unused. See [backend/data/README.md](backend/data/README.md).
 
