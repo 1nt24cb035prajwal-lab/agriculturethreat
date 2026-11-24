@@ -1,6 +1,6 @@
 # Agriculture Threat Fusion
 
-A full-stack agriculture monitoring prototype for farmer profiles, crop recommendations, disease-image review, weather, water planning, satellite NDVI, mandi prices, yield estimates, and saved activity.
+A farmer-focused agriculture platform for farm records, AI crop-disease image screening, a farmer AI chat assistant, weather, water planning, mandi prices, yield estimates, and saved activity.
 
 ## Run locally
 
@@ -50,8 +50,7 @@ Farmer accounts, farm profiles, image records, and activity history are stored i
 
 - Weather and forecast: Open-Meteo, using saved farm coordinates.
 - Location search and reverse geocoding: OpenStreetMap Nominatim.
-- Satellite NDVI: Sentinel Hub Sentinel-2 L2A point sample; configure `SENTINELHUB_CLIENT_ID` and `SENTINELHUB_CLIENT_SECRET`.
-- Mandi prices: the farmer dashboard links directly to the [Agmarknet visualization dashboard](https://visualize.data.gov.in/?inst=9ef84268-d588-465a-a308-a864a43d0070). In-app price results use the data.gov.in API and require `DATA_GOV_IN_API_KEY` and, if needed, `DATA_GOV_IN_MARKET_RESOURCE_ID`.
+- Mandi prices: in-app price results use the data.gov.in API and require `DATA_GOV_IN_API_KEY` and, if needed, `DATA_GOV_IN_MARKET_RESOURCE_ID`.
 - Weather threat alerts: current farm weather and a seven-day forecast from Open-Meteo are checked for configured heat, cold, strong-wind, and heavy-rain thresholds. Alerts refresh on dashboard load and every 15 minutes while open. These are weather indicators only, not pest/disease diagnoses or official emergency warnings.
 - Yield: regional yield estimate from the trained India crop-production model when available; this is historical and not a farm-level or weather-adjusted forecast. See [dataset and licensing notes](backend/data/README.md).
 
@@ -88,11 +87,11 @@ To build the ten-photo disease reference prototype, pass the supplied ZIP to the
 
 This writes `backend/models/plant_disease_reference_model.joblib`. The app matches uploads to the closest of one reference image per disease and reports visual similarity—not diagnostic confidence or measured accuracy.
 
-Dataset archives and generated crop and yield model files are excluded from Git to avoid committing large data or build artifacts. The compact ten-image reference feature artifact is included for deployment. The downloader no longer downloads PlantVillage; existing local PlantVillage files are left untouched and unused. See [backend/data/README.md](backend/data/README.md).
+Dataset archives and generated crop and yield model files are excluded from Git to avoid committing large data or build artifacts. The downloader no longer downloads PlantVillage; existing local PlantVillage files are left untouched and unused. See [backend/data/README.md](backend/data/README.md).
 
 The yield dataset mirror marks its license unknown; check the original Kaggle terms before redistribution or commercial use.
 
-**Disease-model limitations:** the app includes symptom, management, and fertilizer guidance for the ten requested diseases and matches images against one reference photo per disease. Its visual-similarity percentage is not diagnostic confidence; the matcher always returns the closest class, even for an unrelated image. Ten total images cannot validate a >95% accuracy claim. That requires a representative, independently held-out field dataset and measured evaluation. Fertilizer advice is not a disease cure; confirm diagnosis and nutrient needs with a local agricultural expert and soil test.
+**Disease-model limitations:** Gemini can make mistakes, and one photograph cannot confirm a field diagnosis. Disease-specific fertilizer notes are nutritional support only; fertilizer does not cure fungal, bacterial, or viral infections. Confirm disease and nutrient needs with a local agricultural expert and soil test.
 
 **Other model limitations:** the crop recommendation dataset is a benchmark and does not guarantee crop suitability in a specific field. Yield estimates use regional historical production records, do not include weather, variety, soil, or farm-level observations, and report temporal holdout metrics for transparency.
 
@@ -106,7 +105,7 @@ The GitHub Actions workflow runs the backend regression tests on pull requests.
 
 ## Disease detection and weather forecast
 
-Disease photo analysis uses Gemini Vision when the local ten-image reference model is absent. If `backend/models/plant_disease_reference_model.joblib` is present, uploads are matched to the closest of its ten reference photos instead. That prototype reports image-feature similarity only; it is not disease confidence, probability, or measured accuracy and always chooses a closest class.
+Disease photo analysis screens the upload with Gemini Vision first. Non-plant images are rejected with 0% confidence and a request to upload a clear plant photo. Plant images are then checked for possible disease symptoms with cautious guidance; this is not a confirmed field diagnosis.
 
 The farm dashboard retrieves a live seven-day Open-Meteo forecast for saved farm coordinates, including temperature, rainfall probability, rainfall totals, and FAO reference evapotranspiration. It refreshes automatically every 15 minutes and can be refreshed manually.
 
@@ -114,8 +113,8 @@ The farm dashboard retrieves a live seven-day Open-Meteo forecast for saved farm
 
 ## Plant disease detection setup
 
-Disease photo analysis uses Google's Gemini vision API with the `gemini-2.5-flash-lite` model. This avoids loading a large local PyTorch model and helps the app fit smaller web-service memory limits. Create a free-tier API key in Google AI Studio and add it to Render as `GEMINI_API_KEY`. The optional `GEMINI_MODEL` setting defaults to `gemini-2.5-flash-lite`.
+Disease photo screening, disease guidance, and the farmer chat assistant use Google's Gemini API with the `gemini-2.5-flash-lite` model by default. Create a free-tier API key in Google AI Studio and add it to Render as `GEMINI_API_KEY`. The optional `GEMINI_MODEL` setting selects another supported Gemini model.
 
-Google's Gemini API free tier has model-specific rate limits and availability; usage is not unlimited. Review Google's current pricing and rate-limit pages before using the app with many users. The assistant provides cautious visual guidance, not a confirmed field diagnosis.
+Google's Gemini API free tier has model-specific rate limits and availability; usage is not unlimited. Review Google's current pricing and rate-limit pages before using the app with many users. The chatbot gives general farming guidance, while image analysis is not a confirmed field diagnosis. Non-plant images are screened before disease analysis.
 
-To use the optional local ten-reference prototype instead, train it with `python backend\scripts\train_disease_model.py "C:\path\to\dataset_@1.zip"`. When the generated model artifact is present, it takes precedence over Gemini. Its similarity percentage must not be presented as diagnostic confidence.
+
